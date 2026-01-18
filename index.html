@@ -3,209 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <title>OSSAMA TV FOR TV </title>
+    <title>OSSAMA TV FOR TV</title>
 
-    <meta name="description" content="OSSAMA TV - منصتك المفضلة لمتابعة أقوى القنوات والمحتوى الترفيهي والرياضي ببث مباشر وجودة عالية.">
-    <meta name="keywords" content="OSSAMA TV, أسامة تي في, بث مباشر, قنوات عربية, تلفزيون أونلاين, bein sport, ossamatv github">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/video.js/8.10.0/video-js.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
 
-    <link rel="icon" type="image/png" href="https://i.ibb.co/fYkRx1fB/Gemini-Generated-Image-ekxxfoekxxfoekxx.png">
-    <link rel="shortcut icon" href="https://i.ibb.co/fYkRx1fB/Gemini-Generated-Image-ekxxfoekxxfoekxx.png">
-    <link rel="apple-touch-icon" href="https://i.ibb.co/fYkRx1fB/Gemini-Generated-Image-ekxxfoekxxfoekxx.png">
-
-    <link rel="manifest" href="./manifest.json">
-    <meta name="theme-color" content="#020202">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <meta property="og:image" content="https://i.ibb.co/fYkRx1fB/Gemini-Generated-Image-ekxxfoekxxfoekxx.png">
-    <meta itemprop="image" content="https://i.ibb.co/fYkRx1fB/Gemini-Generated-Image-ekxxfoekxxfoekxx.png">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/video.js/8.10.0/video-js.min.css" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/video.js/8.10.0/video.min.js"></script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-hls/5.15.0/videojs-contrib-hls.min.js"></script>
-
-
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
-
-<style>
-:root{
-  --bg:#0a0a12;
-  --card:#141424;
-  --accent:#00e5ff;
-  --text:#fff;
-  --muted:#9ca3af;
-}
-
-*{box-sizing:border-box;font-family:'Tajawal',sans-serif}
-
-body{
-  margin:0;
-  background:linear-gradient(180deg,#05050a,#0a0a12);
-  color:var(--text);
-  overflow:hidden;
-}
-
-header{
-  padding:20px;
-  text-align:center;
-  background:rgba(10,10,25,.8);
-  font-size:32px;
-  font-weight:900;
-  color:var(--accent);
-}
-
-.container{
-  display:flex;
-  height:calc(100vh - 80px);
-}
-
-/* Sidebar */
-.sidebar{
-  width:400px;
-  background:rgba(20,20,40,.8);
-  border-radius:20px;
-  margin:20px;
-  padding:20px;
-  overflow:hidden;
-  display:flex;
-  flex-direction:column;
-  gap:12px;
-}
-
-.category-title{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  font-size:22px;
-  font-weight:900;
-  margin-bottom:12px;
-}
-
-.category-title img{
-  width:50px;
-  height:50px;
-  border-radius:12px;
-}
-
-.channel{
-  display:flex;
-  align-items:center;
-  gap:14px;
-  padding:16px;
-  border-radius:18px;
-  background:linear-gradient(145deg,#15152a,#0d0d18);
-  cursor:pointer;
-  transition:.2s;
-  opacity:.6;
-  font-size:20px;
-}
-
-.channel img{
-  width:60px;
-  height:60px;
-  object-fit:contain;
-}
-
-.channel.active{
-  opacity:1;
-  box-shadow:0 0 25px rgba(0,229,255,.6);
-  border:2px solid rgba(0,229,255,.6);
-}
-
-/* Player */
-.player-area{
-  flex:1;
-  margin:20px;
-  border-radius:30px;
-  background:linear-gradient(180deg,#0e0e1c,#000);
-  display:flex;
-  flex-direction:column;
-  padding:20px;
-  transition:all .3s;
-}
-
-.player-title{
-  font-size:28px;
-  font-weight:900;
-  margin-bottom:16px;
-  text-align:center;
-}
-
-.video-js{
-  width:100%;
-  height:600px;
-  border-radius:26px;
-  outline:none;
-}
-
-.player-fullscreen{
-  position:fixed !important;
-  top:0;
-  left:0;
-  width:100% !important;
-  height:100% !important;
-  z-index:9999;
-  border-radius:0 !important;
-  margin:0 !important;
-}
-
-.info-bar{
-  margin-top:16px;
-  padding:16px;
-  border-radius:20px;
-  background:rgba(0,229,255,.12);
-  display:flex;
-  align-items:center;
-  gap:16px;
-  font-weight:700;
-  font-size:20px;
-}
-
-.info-bar img{
-  width:50px;
-  height:50px;
-}
-
-footer{
-  text-align:center;
-  color:var(--muted);
-  padding:14px;
-  font-size:16px;
-}
-
-/* Focus Highlight */
-.channel:focus, .player-area:focus{
-  outline:none;
-  box-shadow:0 0 25px rgba(0,229,255,.8);
-  transform:scale(1.03);
-}
-</style>
+    <style>
+        :root{ --bg:#0a0a12; --accent:#00e5ff; --text:#fff; --muted:#9ca3af; }
+        *{box-sizing:border-box; font-family:'Tajawal', sans-serif;}
+        body{ margin:0; background:linear-gradient(180deg,#05050a,#0a0a12); color:var(--text); overflow:hidden; }
+        header{ padding:20px; text-align:center; background:rgba(10,10,25,.8); font-size:32px; font-weight:900; color:var(--accent); }
+        .container{ display:flex; height:calc(100vh - 80px); }
+        .sidebar{ width:400px; background:rgba(20,20,40,.8); border-radius:20px; margin:20px; padding:20px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; }
+        .category-title{ display:flex; align-items:center; gap:12px; font-size:22px; font-weight:900; margin-bottom:12px; }
+        .category-title img{ width:50px; height:50px; border-radius:12px; }
+        .channel{ display:flex; align-items:center; gap:14px; padding:16px; border-radius:18px; background:linear-gradient(145deg,#15152a,#0d0d18); cursor:pointer; transition:.2s; opacity:.6; font-size:20px; }
+        .channel img{ width:60px; height:60px; object-fit:contain; }
+        .channel.active{ opacity:1; box-shadow:0 0 25px rgba(0,229,255,.6); border:2px solid rgba(0,229,255,.6); }
+        .player-area{ flex:1; margin:20px; border-radius:30px; background:#000; display:flex; flex-direction:column; padding:20px; position: relative; }
+        .video-js{ width:100% !important; height:600px !important; border-radius:26px; }
+        .player-fullscreen{ position:fixed !important; top:0; left:0; width:100% !important; height:100% !important; z-index:9999; margin:0 !important; border-radius:0 !important; }
+        footer{ text-align:center; color:var(--muted); padding:14px; }
+    </style>
 </head>
-
 <body>
 
 <header>OSSAMA TV</header>
 
 <div class="container">
-  <aside class="sidebar" id="sidebar"></aside>
-
-  <section class="player-area" id="playerArea" tabindex="0">
-    <div class="player-title" id="nowPlaying">اختر قناة</div>
-
-    <video id="tvPlayer" class="video-js vjs-big-play-centered" controls></video>
-
-    <div class="info-bar" id="infoBar" style="display:none">
-      <img id="infoLogo">
-      <div id="infoName"></div>
-    </div>
-  </section>
+    <aside class="sidebar" id="sidebar"></aside>
+    <section class="player-area" id="playerArea" tabindex="0">
+        <div class="player-title" id="nowPlaying" style="margin-bottom:10px; font-size:24px;">اختر قناة</div>
+        <video id="tvPlayer" class="video-js vjs-big-play-centered" controls preload="auto"></video>
+    </section>
 </div>
 
-<footer>OSSAMA TV © TV Mode</footer>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/video.js/8.10.0/video.min.js"></script>
-    <script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/video.js/8.10.0/video.min.js"></script>
+
+<script>
         const categories = [
             {
                 title: "باقة beIN SPORTS <span style='color: red; font-weight: bold; margin-left: 5px;'>(تعمل فقط عند وجود أي مباراة أو حدث مهم)</span>",
@@ -314,96 +149,62 @@ footer{
             }
         ];
 
-const sidebar=document.getElementById("sidebar");
-const player=videojs("tvPlayer");
-const nowPlaying=document.getElementById("nowPlaying");
-const infoBar=document.getElementById("infoBar");
-const infoName=document.getElementById("infoName");
-const infoLogo=document.getElementById("infoLogo");
-const playerArea=document.getElementById("playerArea");
+    // تعريف المشغل مرة واحدة فقط
+    const player = videojs('tvPlayer');
+    
+    const sidebar = document.getElementById("sidebar");
+    const nowPlaying = document.getElementById("nowPlaying");
+    const playerArea = document.getElementById("playerArea");
 
-let allChannels=[];
-let currentChannel = null;
-let isFullScreen = false;
+    let allChannels = [];
+    let currentChannel = null;
+    let isFullScreen = false;
 
-// إنشاء القنوات
-categories.forEach(cat=>{
-  const box=document.createElement("div");
-  box.className="category";
-  box.innerHTML=`
-    <div class="category-title">
-      <img src="${cat.icon}">
-      <div>${cat.title}</div>
-    </div>
-  `;
-  cat.channels.forEach(ch=>{
-    const c=document.createElement("div");
-    c.className="channel";
-    c.tabIndex=0;
-    c.innerHTML=`<img src="${ch.logo}"><span>${ch.name}</span>`;
-    c.onclick=()=>selectChannel(ch,c);
-    box.appendChild(c);
-    allChannels.push(c);
-  });
-  sidebar.appendChild(box);
-});
+    // بناء قائمة القنوات
+    categories.forEach(cat => {
+        const box = document.createElement("div");
+        box.innerHTML = `<div class="category-title"><img src="${cat.icon}"><div>${cat.title}</div></div>`;
+        cat.channels.forEach(ch => {
+            const c = document.createElement("div");
+            c.className = "channel";
+            c.tabIndex = 0;
+            c.innerHTML = `<img src="${ch.logo}"><span>${ch.name}</span>`;
+            c.onclick = () => selectChannel(ch, c);
+            box.appendChild(c);
+            allChannels.push(c);
+        });
+        sidebar.appendChild(box);
+    });
 
-// وظيفة اختيار القناة
-function selectChannel(ch,el){
-  if(currentChannel === ch){
-    // إذا نفس القناة المشغلة → تكبير المشغل
-    playerArea.classList.add("player-fullscreen");
-    isFullScreen = true;
-    player.requestFullscreen();
-  } else {
-    // تشغيل القناة
-    allChannels.forEach(c=>c.classList.remove("active"));
-    el.classList.add("active");
-    nowPlaying.textContent="▶ "+ch.name;
-    infoName.textContent=ch.name;
-    infoLogo.src=ch.logo;
-    infoBar.style.display="flex";
-    currentChannel = ch;
+    function selectChannel(ch, el) {
+        if(currentChannel === ch) {
+            player.requestFullscreen();
+        } else {
+            allChannels.forEach(c => c.classList.remove("active"));
+            el.classList.add("active");
+            nowPlaying.textContent = "▶ " + ch.name;
+            currentChannel = ch;
 
-    if(ch.url.endsWith(".m3u8")){
-      player.src({src:ch.url,type:"application/x-mpegURL"});
-      player.play();
-    }else{
-      window.open(ch.url,"_blank");
+            player.src({ src: ch.url, type: "application/x-mpegURL" });
+            player.play().catch(e => console.log("تحتاج لتفاعل المستخدم للتشغيل"));
+        }
     }
-  }
-}
 
-// ===== دعم أزرار التلفاز =====
-let focusedIndex = 0;
-allChannels[focusedIndex]?.focus();
+    // التحكم بالريموت/الكيبورد
+    document.addEventListener("keydown", e => {
+        let focused = document.activeElement;
+        let index = allChannels.indexOf(focused);
 
-document.addEventListener("keydown", e=>{
-  if(!isFullScreen){
-    // التحكم بالقائمة
-    if(e.key==="ArrowDown"){
-      focusedIndex = (focusedIndex + 1) % allChannels.length;
-      allChannels[focusedIndex].focus();
-    }else if(e.key==="ArrowUp"){
-      focusedIndex = (focusedIndex - 1 + allChannels.length) % allChannels.length;
-      allChannels[focusedIndex].focus();
-    }else if(e.key==="Enter" || e.key==="OK" || e.key===" "){
-      allChannels[focusedIndex].click();
-    }
-  } else {
-    // في وضع التكبير Full Screen
-    if(e.key==="Backspace" || e.key==="Escape"){
-      playerArea.classList.remove("player-fullscreen");
-      isFullScreen = false;
-      document.exitFullscreen();
-    } else if(e.key==="MediaPlayPause"){
-      if(player.paused()) player.play(); else player.pause();
-    } else if(e.key==="MediaStop"){
-      player.pause();
-    }
-  }
-});
+        if(e.key === "ArrowDown") {
+            let next = (index + 1) % allChannels.length;
+            allChannels[next].focus();
+        } else if(e.key === "ArrowUp") {
+            let prev = (index - 1 + allChannels.length) % allChannels.length;
+            allChannels[prev].focus();
+        } else if(e.key === "Enter") {
+            focused.click();
+        }
+    });
 </script>
-
 </body>
 </html>
