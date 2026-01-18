@@ -3,32 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OSSAMA TV - External Player</title>
+    <title>OSSAMA TV - SATELLITE MODE</title>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #05050a; --card: #141424; --accent: #00e5ff; --text: #fff; }
-        body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Tajawal', sans-serif; }
-        header { padding: 25px; text-align: center; background: var(--card); color: var(--accent); font-size: 30px; font-weight: 900; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .container { padding: 20px; max-width: 1200px; margin: auto; }
-        .category-section { margin-bottom: 30px; }
-        .category-title { font-size: 24px; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; color: var(--accent); }
-        .category-title img { width: 40px; height: 25px; border-radius: 4px; }
-        .channels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; }
-        .channel-card { background: var(--card); border-radius: 15px; padding: 15px; text-align: center; cursor: pointer; transition: 0.3s; border: 2px solid transparent; text-decoration: none; color: white; display: block; }
-        .channel-card:hover { transform: translateY(-5px); border-color: var(--accent); box-shadow: 0 0 15px rgba(0,229,255,0.3); }
-        .channel-card img { width: 80px; height: 80px; object-fit: contain; margin-bottom: 10px; background: white; border-radius: 10px; padding: 5px; }
-        .channel-name { font-weight: bold; font-size: 18px; }
-        .hint { text-align: center; color: #9ca3af; margin-top: 10px; font-size: 14px; }
+        :root {
+            --bg-dark: #050a0f;
+            --sidebar-bg: rgba(10, 20, 30, 0.95);
+            --accent-color: #00e5ff;
+            --text-color: #ffffff;
+            --focus-bg: linear-gradient(90deg, #00e5ff, #007bb5);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-color);
+            font-family: 'Tajawal', sans-serif;
+            overflow: hidden;
+            display: flex;
+            height: 100vh;
+        }
+
+        /* القائمة الجانبية تشبه قائمة الستلايت */
+        .sidebar {
+            width: 30%;
+            background: var(--sidebar-bg);
+            border-left: 2px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+            z-index: 2;
+        }
+
+        .header-info {
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .header-info h1 { margin: 0; font-size: 28px; color: var(--accent-color); }
+        .header-info p { margin: 5px 0 0; opacity: 0.6; font-size: 14px; }
+
+        .channel-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .channel-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+            outline: none;
+        }
+
+        /* حالة التركيز (عند استخدام الريموت) */
+        .channel-item:focus {
+            background: var(--focus-bg);
+            transform: scale(1.05);
+            border-color: #fff;
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.5);
+        }
+
+        .channel-num { width: 40px; font-weight: bold; opacity: 0.5; }
+        .channel-logo { width: 45px; height: 45px; object-fit: contain; margin: 0 15px; background: #fff; border-radius: 5px; padding: 2px; }
+        .channel-name { font-size: 20px; font-weight: 700; }
+
+        /* منطقة المعاينة */
+        .preview-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, #1a2a3a 0%, #050a0f 100%);
+            position: relative;
+        }
+
+        .preview-logo { width: 200px; opacity: 0.1; position: absolute; }
+        
+        .instructions {
+            position: absolute;
+            bottom: 40px;
+            display: flex;
+            gap: 20px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px 30px;
+            border-radius: 50px;
+            font-size: 14px;
+        }
+
+        .key-btn { background: #444; padding: 2px 10px; border-radius: 5px; color: var(--accent-color); font-weight: bold; }
+
     </style>
 </head>
 <body>
 
-<header>OSSAMA TV</header>
-
-<div class="container" id="mainContainer">
+    <div class="sidebar">
+        <div class="header-info">
+            <h1>OSSAMA TV</h1>
+            <p id="clock">--:-- --</p>
+        </div>
+        <div class="channel-list" id="channelList">
+            </div>
     </div>
 
-<div class="hint">ملاحظة: عند الضغط على القناة، سيفتح المشغل المتاح في جهازك.</div>
+    <div class="preview-area">
+        <img src="https://i.ibb.co/fYkRx1fB/Gemini-Generated-Image-ekxxfoekxxfoekxx.png" class="preview-logo">
+        <div id="selectedInfo" style="text-align: center;">
+            <h2 style="font-size: 40px; margin-bottom: 10px;">اختر قناة</h2>
+            <p style="opacity: 0.7;">اضغط على OK للمشاهدة في مشغل خارجي</p>
+        </div>
+
+        <div class="instructions">
+            <span><span class="key-btn">OK</span> دخول</span>
+            <span><span class="key-btn">▲▼</span> تنقل</span>
+            <span><span class="key-btn">Exit</span> خروج</span>
+        </div>
+    </div>
 
 <script>
         const categories = [
@@ -124,43 +223,74 @@
                     {name: "العربية", url: "https://www.elahmad.com/tv/radiant.php?id=alarabiya2", logo: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJQAAACUCAMAAABC4vDmAAAAY1BMVEX///8AAAB5eXnu7u51dXVOTk7a2topKSnm5uaTk5P4+PjGxsa4uLjS0tIhISGmpqYJCQlgYGBBQUEbGxuMjIzg4OBXV1eenp7MzMyEhIRvb2+ysrIzMzMSEhJoaGhHR0c6OjoijIy6AAADsUlEQVR4nO2ZW6NCQBCAd8mldSlJUlL//1ce7AzrrsPhPMz3FK3xtWbHBGMEQRAEQRAEQRAEQRAEQRAEQRAEQRBfotsl+t4eKnr2uRS8D97kWPeg5RQDT+UnzfwrKYMjljMxNpbjXMY0+WnqgBWkOM/GL2JH6r6FFH+NnmYnKR6OZdZeUvw8kry7SfGbGBx7lCOejB02TPSS4/DYqESvPg37ryP1qq32r6ModXBDlEr2dqqkNOalIJXa/0XqwNgdp+o571CRs+TUket4XmTrgBJLkWIJSGXTAU03vj4Cw1CtPHlDfESw7cA25qidaOodU2SNUuS/4yqZVSnThxHjEyDs6wUSMFRHunA01t8TbGM2mGGjkJjtZc99PFKVYgF8O1oU7w8lzFdSlpwTkNI6UpybPVIYdrhUMTtQgyyQ0l+8y0d0pXT4Lhh0OoWNIAukTryPZ1dKfOSGMaAkDq0Yv5fC855fvjplRlcKr/NnoFIp2bRUCutP6pieE+MK4xe9KwW3XL+/Veg4LZC6YYhbeQlw8y26Uk/4rvf2f1VsPkul6lCxOrbv8qGU2+OkZKYmtKVSSndSbNvqvLWkMG6PlF3nY1w1VAtWn3hjuAur133SI+UMS10wRplwy6XqPCrO5imz1pE6D0nhGXlYHreCVDU7xblhhUEv15S6wzXq9An6GSPIW9AaUszEoJGA65D1VPRqpjpSMTrBHWgVqaoteWLanNgXUjo2gHgDWkcKC8MHimeqfyNVZRRW1ZWkMJUADedglhQulKp9X0mq1VNhlzdLSsBB9f/nlaREoxGqfvIsKSz0j2oPSFnqKMxWs3VUW0ptITHVC97VL8QSNiqF3XQdDqTOQRBkGoDXON9Rdud4I2lJ8UDLAiDDBVSQyt23nHCGFIS3RFtqFm2p+YxJ2fB7lC55f6meOv8bKc+fHjtfCpaV+uzqN1L3oQHp0BczpFLlyUe3CZ2Wcge+T/ShKZSrHVd1U8pLrgWxsuspdxVoE1QPUqEmhfm+5FiTdyT6sR/ZrJgyzuMvnoZF8IOH/79tj4mdZl+rvQu28i9qk2dyxivMsfKlaRUfQni8pfNi4/UuN5Q/Qts8kpPlvqgXcjIslCqRUkqL8levTprIW17xGMdSpUS/VDwWaiepwzZO30j5G81TN6d8+XgRcupSbshE16KxOKsiXxgaeQK/yzeHN5gp+R5RlkrnGrvbGbHq1WreazXfsf7DN64EQRAEQRAEQRAEQRAEQRAEQRAEQezMD6AvNr5UCWMkAAAAAElFTkSuQmCC" },
                     {name: "الحدث", url: "https://www.elahmad.com/tv/radiant.php?id=alarabiya_alhadath2", logo: "data:image/jpeg;base64,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" },
                     {name: "super sport", url: "https://stream.veo.buzz:6050/sport/ch3/ch3_360.m3u8",logo: "data:image/png;base64,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" },
-            ]
-        }
-        // يمكنك إضافة باقات أخرى هنا بنفس التنسيق
+        // أضف قنواتك هنا بنفس التنسيق
     ];
 
-    const container = document.getElementById('mainContainer');
+    const listContainer = document.getElementById('channelList');
 
-    categories.forEach(cat => {
-        // إنشاء القسم
-        const section = document.createElement('div');
-        section.className = 'category-section';
-        
-        section.innerHTML = `
-            <div class="category-title">
-                <img src="${cat.icon}">
-                <span>${cat.title}</span>
-            </div>
-            <div class="channels-grid" id="grid-${cat.title}"></div>
+    // إنشاء القائمة برمجياً
+    channels.forEach((ch, index) => {
+        const item = document.createElement('div');
+        item.className = 'channel-item';
+        item.tabIndex = 0; // لجعلها قابلة للتركيز بالريموت
+        item.innerHTML = `
+            <div class="channel-num">${(index + 1).toString().padStart(2, '0')}</div>
+            <img class="channel-logo" src="${ch.logo}">
+            <div class="channel-name">${ch.name}</div>
         `;
-        
-        container.appendChild(section);
-        const grid = document.getElementById(`grid-${cat.title}`);
 
-        cat.channels.forEach(ch => {
-            const card = document.createElement('a');
-            card.className = 'channel-card';
-            card.href = ch.url;
-            card.target = "_blank"; // يفتح في نافذة جديدة أو تطبيق
-            
-            card.innerHTML = `
-                <img src="${ch.logo}">
-                <div class="channel-name">${ch.name}</div>
+        // عند الضغط بـ OK أو الماوس
+        item.onclick = () => window.open(ch.url, '_blank');
+        
+        // تحديث معلومات القناة المختارة عند التنقل
+        item.onfocus = () => {
+            document.getElementById('selectedInfo').innerHTML = `
+                <img src="${ch.logo}" style="width:120px; margin-bottom:20px; background:white; padding:10px; border-radius:15px;">
+                <h2 style="font-size: 40px; margin-bottom: 10px;">${ch.name}</h2>
+                <p style="opacity: 0.7;">بث مباشر بجودة عالية</p>
             `;
-            
-            grid.appendChild(card);
-        });
+        };
+
+        listContainer.appendChild(item);
     });
+
+    // التركيز على أول قناة تلقائياً عند الفتح
+    window.onload = () => {
+        document.querySelector('.channel-item').focus();
+        updateClock();
+    };
+
+    // التحكم بالريموت كنترول
+    document.addEventListener('keydown', (e) => {
+        const current = document.activeElement;
+        
+        if (e.key === "ArrowDown") {
+            const next = current.nextElementSibling;
+            if (next) next.focus();
+        } 
+        else if (e.key === "ArrowUp") {
+            const prev = current.previousElementSibling;
+            if (prev) prev.focus();
+        } 
+        else if (e.key === "Enter") {
+            current.click();
+        } 
+        else if (e.key === "Backspace" || e.key === "Escape") {
+            // زر الخروج: يقوم بإغلاق الصفحة أو العودة للخلف
+            if(confirm("هل تريد الخروج من التطبيق؟")) {
+                window.close();
+                // في المتصفحات قد لا تعمل window.close، لذا نوجه لصفحة فارغة
+                window.location.href = "about:blank";
+            }
+        }
+    });
+
+    // تحديث الساعة
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('clock').innerText = now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+        setTimeout(updateClock, 60000);
+    }
 </script>
 
 </body>
