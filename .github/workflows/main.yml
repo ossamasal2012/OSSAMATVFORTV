@@ -1,0 +1,121 @@
+name: Build Android TV APK
+
+# يبني تطبيق "يلا گول TV" (غلاف WebView حول tv.html) إلى ملف APK قابل للتثبيت مباشرة،
+# ويرفعه كمرفق (Artifact) قابل للتحميل من صفحة تشغيل الـ workflow نفسها.
+#
+# ⚠️ ملاحظة مسار مهمة: هذا الـ workflow يفترض أن مشروع أندرويد الخاص بنسخة التلفاز موجود
+# تحت مجلد tv-app/ بجذر المستودع (بجانب مجلد app/ الخاص بتطبيق الجوال إن كانا بنفس
+# المستودع). لو كان مشروع أندرويد هذا هو جذر المستودع نفسه بدلاً من مجلد فرعي، احذف
+# كل "tv-app/" و"working-directory: tv-app" أدناه.
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # يُجهّز Android SDK (منصات + أدوات بناء) ويوافق على تراخيصه تلقائياً — ضروري
+      # لأن صور عدّائي (runners) أوبنتو المستضافة من GitHub لا تضمن دوماً وجود بالضبط
+      # النسخة التي يحتاجها هذا المشروع مُثبّتة مسبقاً.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      # تسريع البناء عبر تخزين مؤقت (cache) لتبعيات Gradle بين مرات التشغيل، ويقرأ
+      # إصدار Gradle المطلوب مباشرة من gradle/wrapper/gradle-wrapper.properties
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        working-directory: tv-app
+        run: chmod +x ./gradlew
+
+      # ── APK التصحيح (Debug) — يُبنى دائماً، بلا أي إعداد إضافي مطلوب ──────────────
+      # يُوقَّع تلقائياً بمفتاح Android الافتراضي (debug keystore)، فهو صالح للتثبيت
+      # المباشر على أي جهاز/صندوق تلفاز فوراً لأغراض الاختبار، دون الحاجة لأي أسرار.
+      - name: Build debug APK
+        working-directory: tv-app
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: yallagoal-tv-debug-apk
+          path: tv-app/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      # ── APK الإصدار الموقَّع (Release) — اختياري بالكامل ──────────────────────────
+      # يُبنى فقط لو أضفت أسرار التوقيع الأربعة التالية بإعدادات المستودع
+      # (Settings → Secrets and variables → Actions → New repository secret):
+      #   SIGNING_KEY_STORE_BASE64    ملف الـ keystore بصيغة base64
+      #                               (أنشئه محلياً بـ: keytool -genkeypair -v -keystore release.keystore
+      #                               -alias yallagoal -keyalg RSA -keysize 2048 -validity 10000
+      #                               ثم رمّزه بـ: base64 -i release.keystore -o release.keystore.b64)
+      #   SIGNING_KEY_STORE_PASSWORD  كلمة مرور الـ keystore
+      #   SIGNING_KEY_ALIAS           اسم المفتاح (alias) بالأعلى: yallagoal
+      #   SIGNING_KEY_PASSWORD        كلمة مرور المفتاح نفسه
+      # بدون هذه الأسرار، تُتخطى هذه الخطوات تلقائياً بلا أي خطأ — يبقى APK التصحيح
+      # أعلاه متاحاً دوماً بغض النظر.
+      - name: Check for release signing secrets
+        id: signing_check
+        run: |
+          if [ -n "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" ]; then
+            echo "has_signing=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_signing=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Decode release keystore
+        if: steps.signing_check.outputs.has_signing == 'true'
+        working-directory: tv-app
+        run: |
+          echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 -d > app/release.keystore
+
+      - name: Build signed release APK
+        if: steps.signing_check.outputs.has_signing == 'true'
+        working-directory: tv-app
+        env:
+          SIGNING_KEY_STORE_PATH: release.keystore
+          SIGNING_KEY_STORE_PASSWORD: ${{ secrets.SIGNING_KEY_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Upload release APK
+        if: steps.signing_check.outputs.has_signing == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: yallagoal-tv-release-apk
+          path: tv-app/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      # ── إصدار GitHub (Release) تلقائي عند دفع وسم إصدار (مثال: git tag v1.0.0) ────
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            tv-app/app/build/outputs/apk/debug/*.apk
+            tv-app/app/build/outputs/apk/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
