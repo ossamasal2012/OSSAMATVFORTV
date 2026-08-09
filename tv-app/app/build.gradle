@@ -1,0 +1,60 @@
+plugins {
+    id 'com.android.application'
+}
+
+// توقيع الإصدار (Release) اختياري بالكامل: يُقرأ من متغيرات بيئة تُمرَّرها main.yml من
+// أسرار GitHub (Secrets) إن وُجدت. لو لم تُضِف هذه الأسرار، يُبنى APK الإصدار بلا توقيع
+// (لا يزال صالحاً للتثبيت اليدوي واختبار الكود)، بينما APK التصحيح (Debug) يُوقَّع تلقائياً
+// بمفتاح Android الافتراضي دوماً بغض النظر عن هذا الإعداد ولا يحتاج أي أسرار إطلاقاً.
+def hasReleaseSigning = System.getenv("SIGNING_KEY_STORE_PATH") != null &&
+        !System.getenv("SIGNING_KEY_STORE_PATH").isEmpty()
+
+android {
+    namespace 'com.yallagoal.tv'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.yallagoal.tv"
+        // minSdk 21: يغطي عملياً كل أجهزة Android TV / صناديق التلفاز الموجودة فعلياً بالسوق
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    if (hasReleaseSigning) {
+        signingConfigs {
+            release {
+                storeFile file(System.getenv("SIGNING_KEY_STORE_PATH"))
+                storePassword System.getenv("SIGNING_KEY_STORE_PASSWORD")
+                keyAlias System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // بلا تصغير/تعتيم (minify/shrink) عمداً: التطبيق مجرد غلاف WebView رفيع
+            // بلا مكتبات ثقيلة، فلا حاجة فعلية له، ويتجنب مشاكل ProGuard الشائعة
+            // مع واجهات WebView/JavaScript إن فُعِّل لاحقاً بلا قواعد استثناء دقيقة.
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
+        }
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // لا نُدرج أي مكتبات AndroidX/UI ثقيلة — التطبيق كله WebView واحد بلا تخطيطات XML
+    // إضافية ولا مكونات Material، حفاظاً على أقصى خفة ممكنة لحجم الـ APK النهائي.
+}
