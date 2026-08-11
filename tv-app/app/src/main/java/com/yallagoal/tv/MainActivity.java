@@ -8,15 +8,17 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 /**
- * غلاف أندرويد رفيع بالكامل حول tv.html — لا توجد أي واجهة جافاسكريبت مخصّصة
- * (JavascriptInterface) هنا لأن الصفحة لا تحتاج استدعاء كود أصلي إطلاقاً؛ كل ما
- * يلزم هو WebView واحد بإعدادات صحيحة، ووصل زر الرجوع الفعلي بالجهاز بمنطق
- * handleBackAction()/isAtRootScreen() المُعرَّف أصلاً داخل tv.html نفسها.
+ * غلاف أندرويد رفيع حول tv.html. مسؤولياته الأساسية:
+ *  1) WebView واحد بإعدادات صحيحة لبث الفيديو والاتصال بالإنترنت.
+ *  2) جسر VLC/لوحة المفاتيح (WebAppInterface) — تشغيل خارجي بالكامل + بحث يعمل.
+ *  3) ربط زر الرجوع الفعلي بمنطق handleBackAction()/isAtRootScreen() بالصفحة.
+ *  4) إصلاح فقدان تركيز الريموت بعد العودة من تطبيق خارجي (VLC) — أهم إصلاح هنا.
  */
 public class MainActivity extends Activity {
 
@@ -27,7 +29,7 @@ public class MainActivity extends Activity {
     //   النص "root" فوراً دون تنفيذ أي شيء آخر، فيُغلق النشاط (Activity) من الطرف
     //   الأصلي (المستوى الأدنى) بدل أن يبقى المستخدم عالقاً بلا طريقة للخروج.
     // - غير ذلك، نُنفّذ handleBackAction() الأصلية بالصفحة (نفس المنطق المستخدم أصلاً
-    //   لكل شاشة: إغلاق المشغّل، الرجوع خطوة بمستويات Xtream، إلخ) ونُعيد "handled".
+    //   لكل شاشة: الرجوع خطوة بمستويات Xtream، إغلاق نافذة خطأ، إلخ) ونُعيد "handled".
     private static final String BACK_HANDLER_JS =
             "(function(){"
                     + "  try {"
@@ -63,21 +65,27 @@ public class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setSupportZoom(false);
-        // تشغيل الفيديو تلقائياً دون اشتراط "لمسة مستخدم" حقيقية من منظور WebView —
-        // ضروري لأن التشغيل هنا يبدأ عبر ضغط ريموت (keydown)، وليس لمسة مباشرة على
-        // عنصر الفيديو نفسه، وبدون هذا الإعداد يرفض WebView تشغيل الفيديو صامتاً.
         settings.setMediaPlaybackRequiresUserGesture(false);
-        // محتوى مختلط مسموح دائماً (نفس نهج تطبيق الجوال بالضبط) — أغلب سيرفرات
-        // Xtream تُستضاف عبر http:// عادي، وهذا دفاع إضافي بجانب بروكسي الكلاود
-        // فلير الذي يمر عبره الطلب أصلاً.
+        // محتوى مختلط مسموح دائماً — بعض روابط سيرفرات Xtream قد تبقى http:// عادية،
+        // ولم يعد هناك أي بروكسي وسيط يتكفّل بهذا لصفحة الويب نفسها بعد الآن.
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
-        settings.setMediaPlaybackRequiresUserGesture(false);
 
-        webView.setWebViewClient(new WebViewClient());
+        // يمنع الصفحة من التنقّل خارج ملف tv.html المحلي نفسه (لو حاول أي رابط/تحويل
+        // مفاجئ فتح عنوان خارجي) — منذ أضفنا جسر AndroidPlayer (يفتح VLC فعلياً)،
+        // من المهم ألا تصل أي صفحة خارجية غير موثوقة لهذا الجسر مطلقاً.
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                String url = request.getUrl().toString();
+                return !url.startsWith("file:///android_asset/");
+            }
+        });
         webView.setWebChromeClient(new WebChromeClient());
+
+        webView.addJavascriptInterface(new WebAppInterface(this, webView), "AndroidPlayer");
 
         // ضروري حتى تصل ضغطات الريموت (الأسهم/OK) فعلياً لمستمع keydown داخل الصفحة
         webView.setFocusable(true);
@@ -98,14 +106,53 @@ public class MainActivity extends Activity {
                         | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
     }
 
+    // ─── إصلاح مشكلة اختفاء مؤشر تركيز الريموت بعد العودة من VLC ───────────────────
+    // السبب الجذري: تشغيل فيديو أصبح يفتح نشاطاً (Activity) خارجياً منفصلاً بالكامل
+    // (VLC) يأخذ تركيز النافذة (window focus) كلياً من نشاطنا. عند إغلاق VLC والعودة،
+    // أندرويد لا "يُعيد" تركيز العرض (view focus) لعنصر الـWebView تلقائياً بمجرد
+    // استعادة تركيز النافذة — يبقى الـWebView ظاهراً بصرياً لكنه لا يستقبل أي ضغطة
+    // ريموت بعد الآن (فلا يظهر أي مؤشر تركيز مطلقاً). الإصلاح: نطلب تركيز الـWebView
+    // صراحة (على مستوى أندرويد) في كل نقطة استئناف ممكنة، ونطلب من الصفحة نفسها إعادة
+    // رسم مؤشر التركيز (tv-focus) صراحة أيضاً كطبقة حماية إضافية.
+    private void reclaimWebViewFocus() {
+        if (webView == null) return;
+        webView.post(() -> {
+            if (webView == null) return;
+            webView.requestFocus(View.FOCUS_DOWN);
+            webView.evaluateJavascript(
+                    "if (typeof updateFocus === 'function') { updateFocus(); }", null);
+        });
+    }
+
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        // بعض الأجهزة تُعيد إظهار أشرطة النظام عند استعادة التركيز (مثل الرجوع من
-        // شاشة تطبيقات حديثة) — نعيد فرض الوضع الغامر (immersive) في كل مرة.
         if (hasFocus) {
+            // بعض الأجهزة تُعيد إظهار أشرطة النظام عند استعادة التركيز (مثل الرجوع
+            // من شاشة تطبيقات حديثة، أو من VLC) — نعيد فرض الوضع الغامر في كل مرة.
             applyImmersiveMode();
+            reclaimWebViewFocus();
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView != null) {
+            webView.onResume();
+            webView.resumeTimers();
+        }
+        applyImmersiveMode();
+        reclaimWebViewFocus();
+    }
+
+    @Override
+    protected void onPause() {
+        if (webView != null) {
+            webView.onPause();
+            webView.pauseTimers();
+        }
+        super.onPause();
     }
 
     @Override
