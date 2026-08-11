@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- يدعم الإنترنت: مطلوبة لتحميل channels.json/xtream.json وتشغيل البث والاتصال
-         ببروكسي الكلاود فلير وبكل سيرفرات Xtream -->
+    <!-- يدعم الإنترنت: مطلوبة لتحميل channels.json/xtream.json والاتصال بسيرفرات
+         Xtream مباشرة (لا يوجد أي بروكسي وسيط) -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
@@ -18,6 +18,14 @@
     <uses-feature
         android:name="android.software.leanback"
         android:required="false" />
+
+    <!-- ⚠️ ضرورية جداً بدءاً من أندرويد 11 (API 30): بدون هذا التصريح، لا يستطيع
+         تطبيقنا "رؤية" ما إذا كان VLC مثبَّتاً على الجهاز إطلاقاً (حتى لو كان مثبَّتاً
+         فعلياً)، بسبب قيود خصوصية رؤية الحزم (Package Visibility) — سيفشل فحص
+         التثبيت ويفشل فتح VLC بصمت دون هذا السطر تحديداً. -->
+    <queries>
+        <package android:name="org.videolan.vlc" />
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -35,6 +43,7 @@
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|uiMode"
             android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/AppTheme">
 
             <!-- منفذ الإطلاق العادي (هواتف/أجهزة لوحية) -->
