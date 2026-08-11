@@ -425,21 +425,12 @@
     </div>
 
     <script>
-        // ============================================================
-        //  إعدادات البروكسي
-        // ============================================================
-        const DEFAULT_ORIGIN = 'https://fortv1.netlify.app';
-        const CORS_PROXY_BASE = "https://yalla-cors-proxy.ossamasal2012.workers.dev";
-
-        function buildProxiedUrl(originalUrl) {
-            if (!CORS_PROXY_BASE) return null;
-            if (originalUrl.startsWith(DEFAULT_ORIGIN)) {
-                const path = originalUrl.substring(DEFAULT_ORIGIN.length);
-                const finalPath = path.startsWith('/') ? path : '/' + path;
-                return `${CORS_PROXY_BASE}${finalPath}`;
-            }
-            return `${CORS_PROXY_BASE}/?url=${encodeURIComponent(originalUrl)}`;
-        }
+        // ملاحظة: بروكسي CORS (Cloudflare Worker) الذي كان يُستخدم سابقاً أُلغي بالكامل من
+        // التطبيق. لم يعد له داعٍ إطلاقاً: تشغيل الفيديو الفعلي أصبح دائماً عبر تطبيق VLC
+        // الخارجي (عملية أندرويد منفصلة تتصل بالشبكة مباشرة، غير متأثرة إطلاقاً بقيود
+        // WebView/CORS)، وWebView نفسه مُهيَّأ أصلاً للسماح بالمحتوى المختلط (cleartext)
+        // على مستوى تطبيق أندرويد نفسه. كل الروابط (قنوات، Xtream) تُستخدم الآن مباشرة
+        // دون أي تمرير عبر أي بروكسي وسيط.
 
         // ============================================================
         //  دوال مساعدة
@@ -1202,8 +1193,29 @@
         }
 
         function handleSearchNav(key) {
-            if      (key === 'ArrowDown') { searchInput.blur(); currentMode = 'CATEGORIES'; updateFocus(); }
-            else if (key === 'Enter')     searchInput.focus();
+            if      (key === 'ArrowDown') { searchInput.blur(); hideKeyboardNative(); currentMode = 'CATEGORIES'; updateFocus(); }
+            else if (key === 'Enter')     { searchInput.focus(); showKeyboardNative(); }
+        }
+
+        // WebView لا يُظهر لوحة المفاتيح البرمجية بشكل موثوق دائماً عند تركيز حقل نصي
+        // عبر استدعاء .focus() من جافاسكريبت (بخلاف لمسة مستخدم حقيقية) — خصوصاً على
+        // أجهزة التلفاز حيث التركيز يأتي أصلاً من ضغطة ريموت (OK) وليس لمسة مباشرة على
+        // الحقل نفسه. لذا نطلب إظهارها صراحة عبر جسر أندرويد الأصلي بدل الاعتماد فقط
+        // على سلوك WebView التلقائي غير المضمون بهذه الحالة تحديداً.
+        function showKeyboardNative() {
+            try {
+                if (window.AndroidPlayer && typeof window.AndroidPlayer.showKeyboard === 'function') {
+                    window.AndroidPlayer.showKeyboard();
+                }
+            } catch (e) { /* بيئة اختبار بلا الجسر الأصلي — تجاهل بهدوء */ }
+        }
+
+        function hideKeyboardNative() {
+            try {
+                if (window.AndroidPlayer && typeof window.AndroidPlayer.hideKeyboard === 'function') {
+                    window.AndroidPlayer.hideKeyboard();
+                }
+            } catch (e) { /* بيئة اختبار بلا الجسر الأصلي — تجاهل بهدوء */ }
         }
 
         function handleCategoriesNav(key) {
@@ -1735,14 +1747,11 @@
             }
         }
 
-        // 🔒 نفس بروكسي CORS بالضبط الذي تعتمده كل قنوات التطبيق (buildProxiedUrl) —
-        // وبنفس الطريقة الحتمية تماماً (لا محاولة اتصال مباشر بديلة إطلاقاً، تماماً
-        // كما يعمل تشغيل أي قناة عادية بالتطبيق: "إن وُجد بروكسي فهو الوحيد المستخدم").
-        // نُعيد المحاولة على نفس الرابط المُمرَّر بالبروكسي فقط عند فشل عابر بالشبكة
-        // (ليس كبديل توجيه آخر)، حتى تبقى كل طلبات Xtream فعلياً عبر الكلاود فلير دوماً.
+        // اتصال مباشر ببانل Xtream دون أي بروكسي وسيط — WebView مُهيَّأ أصلاً للسماح
+        // بالمحتوى المختلط (http://) على مستوى تطبيق أندرويد نفسه، فلا حاجة له إطلاقاً.
+        // نُعيد المحاولة على نفس الرابط عند فشل عابر بالشبكة فقط.
         async function xtreamApiCall(server, extraParams, { timeoutMs = 12000, retries = 1 } = {}) {
-            const directUrl = xtreamApiUrl(server, extraParams);
-            const requestUrl = buildProxiedUrl(directUrl) || directUrl;
+            const requestUrl = xtreamApiUrl(server, extraParams);
             let lastErr = null;
             for (let attempt = 0; attempt <= retries; attempt++) {
                 try {
@@ -2289,7 +2298,7 @@
                     return;
                 }
 
-                const urlToSwap = isCurrentSessionProxied ? (buildProxiedUrl(newUrl) || newUrl) : newUrl;
+                const urlToSwap = newUrl;
 
                 await hotSwapHlsSource(urlToSwap);
                 if (activeApiChannelUrl !== apiUrl) return;
@@ -2456,15 +2465,7 @@
             currentOpenChannelObj = channel;
             currentServerIndex = serverIndex;
 
-            // نضبط الوضع فوراً إلى "تحميل" حتى لو استغرق الأمر ثوانٍ (تحليل رابط
-            // API أو تحميل HLS). بدون هذا يبقى الوضع "CHANNELS" أثناء التحميل،
-            // فيتفاعل زر الرجوع مع قائمة القنوات بدل إغلاق شاشة التحميل الظاهرة
-            // فعلياً فوق كل شيء.
-            currentMode = 'PLAYER_LOADING';
-
-            // نصفّر حالة تحديث الـ API القديمة في بداية كل تشغيل جديد، حتى لو
-            // كانت القناة السابقة من نوع API ولم نمرّ بـ closePlayer(). بدون هذا
-            // قد يستمر مؤقت قديم ويستبدل بصمت فيديو القناة الجديدة بالخطأ.
+            // تصفير حالة تحديث الـ API القديمة (لا تزال مستخدمة فقط بمسار iframe أدناه)
             if (streamRefreshTimer) { clearTimeout(streamRefreshTimer); streamRefreshTimer = null; }
             activeApiChannelUrl = null;
             currentActiveStreamUrl = null;
@@ -2475,41 +2476,65 @@
             const rawType = server.type || 'v';
             // أي رابط API (مثل adam-bein.vercel.app/api/channel?ch=) نتيجته دائماً
             // رابط m3u8 فيديو حقيقي، حتى لو كان النوع المخزّن للقناة "iframe".
-            // فرض النوع "فيديو" هنا يمنع فتح iframe يحاول عرض رابط m3u8 كصفحة ويب
-            // (وهو ما يسبب شاشة سوداء/فشل تشغيل فوري).
             const type = isApiUrl(url) ? 'v' : rawType;
             const name = channel.name;
 
+            if (type === 'i') {
+                // محتوى iframe (صفحة تضمين HTML، وليس رابط فيديو مباشراً) — لا معنى
+                // لفتحه بـVLC (يتعامل مع ملفات/بثوث الوسائط فقط، لا صفحات ويب)، فيستمر
+                // بنفس آلية العرض داخل الصفحة كما كانت العادة دائماً بهذا التطبيق.
+                currentMode = 'PLAYER_LOADING';
+                startPlayer(url, type, name, channel, serverIndex);
+                return;
+            }
+
             if (isApiUrl(url)) {
-                // نظهر شاشة التحميل فوراً حتى لا يبدو التطبيق متجمداً أثناء
-                // انتظار تحليل رابط الـ API (قد يستغرق ثانية أو اثنتين).
-                playerContainer.classList.add('active');
-                playerLoader.classList.remove('hidden');
-                document.getElementById('player-loading-text').innerText = `جاري تحضير: ${name}`;
-
+                // رابط API ديناميكي — نحلّه أولاً للحصول على رابط الفيديو الحقيقي
+                // القابل للتشغيل، ثم نفتحه مباشرة بـVLC كأي رابط آخر تماماً.
+                showStatus('⏳ جاري التحضير...');
                 resolveStreamUrl(url).then(resolved => {
-                    const realUrl = resolved.streamUrl;
-                    const expires = resolved.expiresInSeconds;
-                    activeApiChannelUrl = url;
-                    currentActiveStreamUrl = realUrl;
-                    isCurrentSessionProxied = true;
-                    scheduleStreamRefresh(expires, false);
-
-                    const finalUrl = buildProxiedUrl(realUrl) || realUrl;
-                    startPlayer(finalUrl, type, name, channel, serverIndex);
+                    launchInVlc(resolved.streamUrl, name);
                 }).catch(err => {
                     console.error("فشل جلب رابط API:", err);
-                    showErrorModal('تعذر جلب رابط البث المتجدد من المصدر.', channel, serverIndex);
+                    showErrorModal('تعذر جلب رابط البث من المصدر.', channel, serverIndex);
                 });
                 return;
             }
 
-            let finalUrl = url;
-            if (type === 'v' && typeof CORS_PROXY_BASE !== 'undefined' && CORS_PROXY_BASE) {
-                const proxied = buildProxiedUrl(url);
-                if (proxied) finalUrl = proxied;
+            // كل محتوى فيديو آخر (كل قنوات/أفلام/مسلسلات Xtream، وأي رابط قناة مباشر
+            // عادي) يُفتح الآن حصراً بتطبيق VLC الخارجي — لا تشغيل داخل الصفحة إطلاقاً.
+            launchInVlc(url, name);
+        }
+
+        // ============================================================
+        //  ▶️ نقطة التشغيل الوحيدة لكل محتوى فيديو بالتطبيق: فتح الرابط مباشرة بتطبيق
+        //  VLC الخارجي (نفس تطبيق VLC العادي المُستخدم بالهواتف والأجهزة اللوحية —
+        //  يعمل بواجهة تتكيّف تلقائياً مع أجهزة التلفاز أيضاً، لا يوجد إصدار Android TV
+        //  منفصل بحزمة مختلفة). لا نُشغّل أي شيء داخل الصفحة نفسها بعد الآن لهذا المسار:
+        //  لا HLS.js ولا mpegts.js ولا dash.js ولا <video> — VLC وحده مسؤول بالكامل عن
+        //  التشغيل الفعلي، بأي صيغة كانت (m3u8/ts/mp4/mkv/كل ما يدعمه VLC نفسه).
+        //
+        //  عمداً لا نُغيّر currentMode هنا: تطبيق VLC يفتح كنشاط أندرويد منفصل يغطي
+        //  الشاشة بالكامل، وصفحتنا تبقى بخلفية بالضبط بنفس الشاشة/التركيز الذي كانت
+        //  عليه — فعند العودة من VLC (زر الرجوع بالريموت)، نظهر فوراً بنفس المكان
+        //  تماماً دون أي حاجة لاستعادة حالة، ويبقى تحكم الريموت شغّالاً بلا انقطاع.
+        // ============================================================
+        function launchInVlc(url, name) {
+            if (!url) return;
+            if (window.AndroidPlayer && typeof window.AndroidPlayer.playInVlc === 'function') {
+                try {
+                    window.AndroidPlayer.playInVlc(url, name || '');
+                    showStatus('▶️ جاري فتح VLC...');
+                } catch (e) {
+                    console.error('تعذر استدعاء VLC:', e);
+                    showStatus('⚠️ تعذر فتح VLC');
+                }
+            } else {
+                // بيئة اختبار بمتصفح عادي بلا الجسر الأصلي (لا يوجد AndroidPlayer) —
+                // نُظهر تنبيهاً واضحاً بدل فشل صامت لا يوضّح السبب.
+                console.warn('AndroidPlayer.playInVlc غير متاح بهذه البيئة. الرابط:', url);
+                showStatus('⚠️ التشغيل عبر VLC متاح فقط داخل تطبيق أندرويد');
             }
-            startPlayer(finalUrl, type, name, channel, serverIndex);
         }
 
         function startPlayer(finalUrl, type, name, channel, serverIndex) {
@@ -3064,10 +3089,20 @@
         });
 
         searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') { searchInput.blur(); currentMode = 'CATEGORIES'; updateFocus(); }
+            if (e.key === 'Escape') { searchInput.blur(); hideKeyboardNative(); currentMode = 'CATEGORIES'; updateFocus(); }
         });
 
         // ─── تشغيل ────────────────────────────────────────────────────────
+        // ─── إصلاح إضافي (شبكة أمان جافاسكريبت) لمشكلة اختفاء مؤشر تركيز الريموت ───
+        // بعد العودة من تطبيق خارجي (VLC): الإصلاح الأساسي على مستوى أندرويد نفسه
+        // (MainActivity يُعيد طلب تركيز WebView صراحة)، لكن نُضيف هنا أيضاً إعادة رسم
+        // مؤشر التركيز (tv-focus) صراحة عند استعادة الصفحة تركيزها/ظهورها من جديد،
+        // كطبقة حماية إضافية بغض النظر عن سبب فقدانه.
+        window.addEventListener('focus', () => { if (typeof updateFocus === 'function') updateFocus(); });
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && typeof updateFocus === 'function') updateFocus();
+        });
+
         window.onload = checkAuth;
     </script>
 </body>
