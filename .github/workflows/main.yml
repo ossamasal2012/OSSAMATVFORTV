@@ -1,17 +1,13 @@
 name: Build Android TV APK
 
-# يبني تطبيق "يلا گول TV" (غلاف WebView حول tv.html) إلى ملف APK قابل للتثبيت مباشرة،
-# ويرفعه كمرفق (Artifact) قابل للتحميل من صفحة تشغيل الـ workflow نفسها.
-#
-# ⚠️ ملاحظة مسار مهمة: هذا الـ workflow يفترض أن مشروع أندرويد الخاص بنسخة التلفاز موجود
-# تحت مجلد tv-app/ بجذر المستودع (بجانب مجلد app/ الخاص بتطبيق الجوال إن كانا بنفس
-# المستودع). لو كان مشروع أندرويد هذا هو جذر المستودع نفسه بدلاً من مجلد فرعي، احذف
-# كل "tv-app/" و"working-directory: tv-app" أدناه.
+# يبني تطبيق "يلا گول TV" ويُنشر OTA تلقائياً من دون أي Tag يدوي:
+# يغيّر المطور versionCode/versionName فقط ثم يعمل Commit/Push إلى الفرع الرئيسي.
+# عند زيادة versionCode فقط، يُحدّث الـ workflow إصدار GitHub ثابتاً واحداً باسم
+# ota-stable ويرفع asset ثابت الاسم: version.json و yallagoal-tv.apk.
 
 on:
   push:
     branches: [ main, master ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch: {}
@@ -27,6 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -34,14 +32,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # يُجهّز Android SDK (منصات + أدوات بناء) ويوافق على تراخيصه تلقائياً — ضروري
-      # لأن صور عدّائي (runners) أوبنتو المستضافة من GitHub لا تضمن دوماً وجود بالضبط
-      # النسخة التي يحتاجها هذا المشروع مُثبّتة مسبقاً.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
-      # تسريع البناء عبر تخزين مؤقت (cache) لتبعيات Gradle بين مرات التشغيل، ويقرأ
-      # إصدار Gradle المطلوب مباشرة من gradle/wrapper/gradle-wrapper.properties
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
@@ -49,34 +42,74 @@ jobs:
         working-directory: tv-app
         run: chmod +x ./gradlew
 
-      # ── APK التصحيح (Debug) — يُبنى دائماً، بلا أي إعداد إضافي مطلوب ──────────────
-      # يُوقَّع تلقائياً بمفتاح Android الافتراضي (debug keystore)، فهو صالح للتثبيت
-      # المباشر على أي جهاز/صندوق تلفاز فوراً لأغراض الاختبار، دون الحاجة لأي أسرار.
+      - name: Read Android version
+        id: android_version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION_CODE=$(awk '/^[[:space:]]*versionCode[[:space:]]+/ {print $2; exit}' tv-app/app/build.gradle)
+          VERSION_NAME=$(awk -F'"' '/^[[:space:]]*versionName[[:space:]]+/ {print $2; exit}' tv-app/app/build.gradle)
+          if ! [[ "$VERSION_CODE" =~ ^[0-9]+$ ]]; then
+            echo "Invalid versionCode in tv-app/app/build.gradle: $VERSION_CODE" >&2
+            exit 1
+          fi
+          if [ -z "$VERSION_NAME" ]; then
+            echo "Invalid versionName in tv-app/app/build.gradle" >&2
+            exit 1
+          fi
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Read currently published OTA version
+        id: published_ota
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          VERSION_JSON_URL: https://github.com/${{ github.repository }}/releases/latest/download/version.json
+        run: |
+          set -euo pipefail
+          HTTP_CODE=$(curl -L --connect-timeout 10 --max-time 30 -sS -w '%{http_code}' -o /tmp/published-version.json "$VERSION_JSON_URL" || true)
+          if [ "$HTTP_CODE" = "200" ]; then
+            PUBLISHED_VERSION_CODE=$(python3 -c "import json; print(int(json.load(open('/tmp/published-version.json', encoding='utf-8')).get('versionCode', 0)))")
+          else
+            PUBLISHED_VERSION_CODE=0
+          fi
+          echo "published_version_code=$PUBLISHED_VERSION_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Decide OTA publication
+        id: ota_decision
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURRENT=${{ steps.android_version.outputs.version_code }}
+          PUBLISHED=${{ steps.published_ota.outputs.published_version_code }}
+          if [ "$CURRENT" -lt "$PUBLISHED" ]; then
+            echo "Refusing to publish OTA: current versionCode ($CURRENT) is lower than already published versionCode ($PUBLISHED)." >&2
+            exit 1
+          fi
+          if [ "$CURRENT" -eq "$PUBLISHED" ]; then
+            echo "publish_ota=false" >> "$GITHUB_OUTPUT"
+            echo "versionCode $CURRENT is already published; skipping OTA release upload."
+          else
+            echo "publish_ota=true" >> "$GITHUB_OUTPUT"
+            echo "versionCode $CURRENT is newer than published $PUBLISHED; OTA release will be updated."
+          fi
+
       - name: Build debug APK
         working-directory: tv-app
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: Upload debug APK
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: yallagoal-tv-debug-apk
           path: tv-app/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
-      # ── APK الإصدار الموقَّع (Release) — اختياري بالكامل ──────────────────────────
-      # يُبنى فقط لو أضفت أسرار التوقيع الأربعة التالية بإعدادات المستودع
-      # (Settings → Secrets and variables → Actions → New repository secret):
-      #   SIGNING_KEY_STORE_BASE64    ملف الـ keystore بصيغة base64
-      #                               (أنشئه محلياً بـ: keytool -genkeypair -v -keystore release.keystore
-      #                               -alias yallagoal -keyalg RSA -keysize 2048 -validity 10000
-      #                               ثم رمّزه بـ: base64 -i release.keystore -o release.keystore.b64)
-      #   SIGNING_KEY_STORE_PASSWORD  كلمة مرور الـ keystore
-      #   SIGNING_KEY_ALIAS           اسم المفتاح (alias) بالأعلى: yallagoal
-      #   SIGNING_KEY_PASSWORD        كلمة مرور المفتاح نفسه
-      # بدون هذه الأسرار، تُتخطى هذه الخطوات تلقائياً بلا أي خطأ — يبقى APK التصحيح
-      # أعلاه متاحاً دوماً بغض النظر.
       - name: Check for release signing secrets
         id: signing_check
+        if: github.event_name == 'push' && steps.ota_decision.outputs.publish_ota == 'true'
         run: |
           if [ -n "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" ]; then
             echo "has_signing=true" >> "$GITHUB_OUTPUT"
@@ -85,13 +118,17 @@ jobs:
           fi
 
       - name: Decode release keystore
-        if: steps.signing_check.outputs.has_signing == 'true'
+        if: github.event_name == 'push' && steps.ota_decision.outputs.publish_ota == 'true' && steps.signing_check.outputs.has_signing == 'true'
         working-directory: tv-app
-        run: |
-          echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 -d > app/release.keystore
+        run: echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 -d > app/release.keystore
+
+      - name: Build unsigned release APK
+        if: github.event_name == 'push' && steps.ota_decision.outputs.publish_ota == 'true' && steps.signing_check.outputs.has_signing != 'true'
+        working-directory: tv-app
+        run: ./gradlew assembleRelease --stacktrace
 
       - name: Build signed release APK
-        if: steps.signing_check.outputs.has_signing == 'true'
+        if: github.event_name == 'push' && steps.ota_decision.outputs.publish_ota == 'true' && steps.signing_check.outputs.has_signing == 'true'
         working-directory: tv-app
         env:
           SIGNING_KEY_STORE_PATH: release.keystore
@@ -100,22 +137,49 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --stacktrace
 
-      - name: Upload release APK
-        if: steps.signing_check.outputs.has_signing == 'true'
+      - name: Prepare stable OTA files
+        if: github.event_name == 'push' && steps.ota_decision.outputs.publish_ota == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ota
+          APK=$(find tv-app/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "Release APK was not produced." >&2
+            exit 1
+          fi
+          cp "$APK" ota/yallagoal-tv.apk
+          export APK_URL="https://github.com/${{ github.repository }}/releases/latest/download/yallagoal-tv.apk"
+          export VERSION_CODE="${{ steps.android_version.outputs.version_code }}"
+          export VERSION_NAME="${{ steps.android_version.outputs.version_name }}"
+          python3 -c 'import json, os; data={"versionCode": int(os.environ["VERSION_CODE"]), "versionName": os.environ["VERSION_NAME"], "force_update": False, "apk_url": os.environ["APK_URL"], "release_notes": "تحديث جديد لتطبيق يلا گول"}; open("ota/version.json", "w", encoding="utf-8").write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")'
+          cat ota/version.json
+
+      - name: Create or update stable OTA GitHub Release
+        if: github.event_name == 'push' && steps.ota_decision.outputs.publish_ota == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STABLE_TAG: ota-stable
+        run: |
+          set -euo pipefail
+          TITLE="Yalla Goal TV stable v${{ steps.android_version.outputs.version_name }} (${{ steps.android_version.outputs.version_code }})"
+          NOTES="Stable OTA release generated automatically from versionCode ${{ steps.android_version.outputs.version_code }} / versionName ${{ steps.android_version.outputs.version_name }}."
+
+          if gh release view "$STABLE_TAG" >/dev/null 2>&1; then
+            gh release edit "$STABLE_TAG" --title "$TITLE" --notes "$NOTES" --target "$GITHUB_SHA" --latest
+          else
+            gh release create "$STABLE_TAG" --title "$TITLE" --notes "$NOTES" --target "$GITHUB_SHA" --latest
+          fi
+
+          gh release delete-asset "$STABLE_TAG" version.json --yes 2>/dev/null || true
+          gh release delete-asset "$STABLE_TAG" yallagoal-tv.apk --yes 2>/dev/null || true
+          gh release upload "$STABLE_TAG" ota/version.json ota/yallagoal-tv.apk --clobber
+
+      - name: Upload OTA artifacts
+        if: github.event_name == 'push' && steps.ota_decision.outputs.publish_ota == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: yallagoal-tv-release-apk
-          path: tv-app/app/build/outputs/apk/release/*.apk
+          name: yallagoal-tv-ota
+          path: ota/*
           if-no-files-found: error
-
-      # ── إصدار GitHub (Release) تلقائي عند دفع وسم إصدار (مثال: git tag v1.0.0) ────
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: |
-            tv-app/app/build/outputs/apk/debug/*.apk
-            tv-app/app/build/outputs/apk/release/*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

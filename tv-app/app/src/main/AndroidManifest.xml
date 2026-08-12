@@ -5,6 +5,7 @@
          Xtream مباشرة (لا يوجد أي بروكسي وسيط) -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- التطبيق يعمل بلا لمس إطلاقاً (تحكم كامل بالريموت/لوحة مفاتيح)، لذا نصرّح أن
          اللمس غير مطلوب — ضروري حتى تعتبر متاجر التطبيقات وأجهزة Android TV هذا
@@ -25,6 +26,10 @@
          التثبيت ويفشل فتح VLC بصمت دون هذا السطر تحديداً. -->
     <queries>
         <package android:name="org.videolan.vlc" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
     </queries>
 
     <application
@@ -60,6 +65,17 @@
             </intent-filter>
 
         </activity>
+
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 
