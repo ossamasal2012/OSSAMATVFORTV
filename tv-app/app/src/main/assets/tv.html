@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -1193,24 +1194,15 @@
         }
 
         function handleSearchNav(key) {
-            if      (key === 'ArrowDown') { searchInput.blur(); currentMode = 'CATEGORIES'; updateFocus(); }
-            else if (key === 'Enter')     { searchInput.focus(); }
+            if      (key === 'ArrowDown') { searchInput.blur(); hideKeyboardNative(); currentMode = 'CATEGORIES'; updateFocus(); }
+            else if (key === 'Enter')     { searchInput.focus(); showKeyboardNative(); }
         }
 
-        // ─── جسر لوحة المفاتيح البرمجية (Android IME) ──────────────────────────
-        // السبب الجذري الأصلي للمشكلة: WebView لا يُظهر لوحة المفاتيح تلقائياً عند
-        // تركيز حقل نصي عبر استدعاء .focus() من جافاسكريبت (بخلاف لمسة مستخدم
-        // حقيقية) — خصوصاً على أجهزة التلفاز حيث التركيز يأتي أصلاً من ضغطة ريموت
-        // (OK) لا من لمس الحقل نفسه. لذا نطلب إظهارها/إخفاءها صراحة عبر جسر أندرويد
-        // الأصلي (AndroidPlayer.showKeyboard/hideKeyboard في WebAppInterface.java).
-        //
-        // سابقاً كان هذا الاستدعاء يتم يدوياً بكل مكان يُغيَّر فيه تركيز الحقلين
-        // (authInput وsearchInput) على حِدة — وهذا ما جعل الاستدعاء "يُنسى" فعلياً
-        // بمكان واحد على الأقل (حقل رمز التفعيل بشاشة الدخول الأولى)، فلا تظهر
-        // لوحة المفاتيح إطلاقاً هناك. الحل الآن: نربط الجسر مباشرة بحدثي focus/blur
-        // *الحقيقيين* للحقلين أدناه، فيصبحان مصدراً وحيداً للحقيقة — أي كود حالي أو
-        // مستقبلي يُركِّز/يُلغي تركيز أحد الحقلين سيُطلق تلقائياً الاستدعاء الصحيح،
-        // دون إمكانية نسيانه بموضع جديد لاحقاً.
+        // WebView لا يُظهر لوحة المفاتيح البرمجية بشكل موثوق دائماً عند تركيز حقل نصي
+        // عبر استدعاء .focus() من جافاسكريبت (بخلاف لمسة مستخدم حقيقية) — خصوصاً على
+        // أجهزة التلفاز حيث التركيز يأتي أصلاً من ضغطة ريموت (OK) وليس لمسة مباشرة على
+        // الحقل نفسه. لذا نطلب إظهارها صراحة عبر جسر أندرويد الأصلي بدل الاعتماد فقط
+        // على سلوك WebView التلقائي غير المضمون بهذه الحالة تحديداً.
         function showKeyboardNative() {
             try {
                 if (window.AndroidPlayer && typeof window.AndroidPlayer.showKeyboard === 'function') {
@@ -1226,11 +1218,6 @@
                 }
             } catch (e) { /* بيئة اختبار بلا الجسر الأصلي — تجاهل بهدوء */ }
         }
-
-        [authInput, searchInput].forEach((field) => {
-            field.addEventListener('focus', showKeyboardNative);
-            field.addEventListener('blur', hideKeyboardNative);
-        });
 
         function handleCategoriesNav(key) {
             const max = document.querySelectorAll('.category-btn').length - 1;
@@ -3103,7 +3090,7 @@
         });
 
         searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') { searchInput.blur(); currentMode = 'CATEGORIES'; updateFocus(); }
+            if (e.key === 'Escape') { searchInput.blur(); hideKeyboardNative(); currentMode = 'CATEGORIES'; updateFocus(); }
         });
 
         // ─── تشغيل ────────────────────────────────────────────────────────
