@@ -23,6 +23,7 @@ import android.webkit.WebViewClient;
 public class MainActivity extends Activity {
 
     private WebView webView;
+    private UpdateManager updateManager;
 
     // يُنفَّذ داخل صفحة الويب عند كل ضغطة على زر الرجوع الفعلي بالجهاز/الريموت:
     // - إن كنا بشاشة جذرية (isAtRootScreen) لا معنى للرجوع عنها داخل الصفحة، نُعيد
@@ -55,6 +56,7 @@ public class MainActivity extends Activity {
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
+        settings.setTextZoom(100);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         // وضع تكبير الشاشة: نجعل الصفحة تملأ الشاشة بالكامل وتُحسب أبعادها كصفحة
@@ -91,8 +93,11 @@ public class MainActivity extends Activity {
         webView.setFocusable(true);
         webView.setFocusableInTouchMode(true);
 
+        updateManager = new UpdateManager(this);
+
         webView.loadUrl("file:///android_asset/tv.html");
         webView.requestFocus(View.FOCUS_DOWN);
+        updateManager.checkForUpdates();
     }
 
     private void applyImmersiveMode() {
@@ -120,7 +125,7 @@ public class MainActivity extends Activity {
             if (webView == null) return;
             webView.requestFocus(View.FOCUS_DOWN);
             webView.evaluateJavascript(
-                    "if (typeof updateFocus === 'function') { updateFocus(); }", null);
+                    "if (typeof restoreRemoteFocusState === 'function') { restoreRemoteFocusState(); } else if (typeof updateFocus === 'function') { updateFocus(); }", null);
         });
     }
 
@@ -144,6 +149,7 @@ public class MainActivity extends Activity {
         }
         applyImmersiveMode();
         reclaimWebViewFocus();
+        if (updateManager != null) updateManager.retryPendingInstallIfAllowed();
     }
 
     @Override

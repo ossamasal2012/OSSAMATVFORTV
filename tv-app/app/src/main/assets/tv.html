@@ -33,6 +33,11 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 
+        :root {
+            /* التحكم المركزي بحجم واجهة التلفاز بالكامل: 0.90 أكبر، 0.70 أصغر */
+            --ui-scale: 0.80;
+        }
+
         body {
             font-family: 'Tajawal', sans-serif;
             background-color: #020617;
@@ -50,6 +55,20 @@
             position: fixed; inset: 0; background: #020617; z-index: 99999;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
+
+        .channel-item, .category-btn, .modal-btn, .control-item, .menu-option, .server-chip, .back-btn-top, .iframe-btn, .error-btn {
+            transform-origin: center;
+        }
+
+        #main-app aside > div, #categoryMenu, #channelsBox { padding: calc(1rem * var(--ui-scale)) !important; }
+        #searchInput { padding-top: calc(0.75rem * var(--ui-scale)) !important; padding-bottom: calc(0.75rem * var(--ui-scale)) !important; font-size: calc(0.875rem * var(--ui-scale)) !important; }
+        .category-btn { padding: calc(0.5rem * var(--ui-scale)) calc(1rem * var(--ui-scale)) !important; font-size: calc(0.875rem * var(--ui-scale)) !important; }
+        .channel-item, .back-btn-top { padding: calc(1rem * var(--ui-scale)) !important; }
+        .channel-item span, .back-btn-top { font-size: calc(1.125rem * var(--ui-scale)) !important; }
+        .modal-content { padding: calc(30px * var(--ui-scale)); max-width: calc(400px * var(--ui-scale)); }
+        .modal-btn { padding: calc(15px * var(--ui-scale)); font-size: calc(1.1rem * var(--ui-scale)); }
+        .control-item { padding: calc(12px * var(--ui-scale)) calc(20px * var(--ui-scale)); min-width: calc(120px * var(--ui-scale)); font-size: calc(1.1rem * var(--ui-scale)); }
+        .server-chip { font-size: calc(11px * var(--ui-scale)); padding: calc(5px * var(--ui-scale)) calc(12px * var(--ui-scale)); }
 
         .tv-focus {
             border-color: #10b981 !important;
@@ -502,6 +521,8 @@
         const SECRET_CODE = "ossamatt22";
 
         let focusIndices = { auth: 0, channels: 0, categories: 0, controls: 0, menu: 0, modal: 0, servers: 0, iframeBtns: 0, errorBtns: 0, serverChips: 0, xtream: 0 };
+        let isSearchEditing = false;
+        let lastRemoteFocusState = null;
 
         // ─── العناصر ──────────────────────────────────────────────────────
         const authScreen      = document.getElementById('auth-screen');
@@ -704,6 +725,7 @@
 
         // ─── تصفية وعرض القنوات ──────────────────────────────────────────
         function filterChannels() {
+            const previousFocusKey = getChannelFocusKey();
             let list = [];
             isInFolder = false;
 
@@ -743,10 +765,31 @@
                 filteredChannels = list;
             }
 
-            renderChannels();
+            renderChannels({ preserveFocus: true, focusKey: previousFocusKey });
         }
 
-        function renderChannels() {
+        function getChannelFocusKey() {
+            const offset = isInFolder ? 1 : 0;
+            if (isInFolder && focusIndices.channels === 0) return '__back_to_main__';
+            const ch = filteredChannels[focusIndices.channels - offset];
+            if (!ch) return null;
+            return ch.isFolder ? `folder:${ch.folderType}:${ch.name}` : `channel:${ch.name}:${ch.url || ''}`;
+        }
+
+        function restoreChannelFocusKey(key) {
+            if (!key) return false;
+            if (key === '__back_to_main__' && isInFolder) { focusIndices.channels = 0; return true; }
+            const idx = filteredChannels.findIndex(ch => {
+                const candidate = ch.isFolder ? `folder:${ch.folderType}:${ch.name}` : `channel:${ch.name}:${ch.url || ''}`;
+                return candidate === key;
+            });
+            if (idx < 0) return false;
+            focusIndices.channels = idx + (isInFolder ? 1 : 0);
+            return true;
+        }
+
+        function renderChannels(options = {}) {
+            const previousKey = options.preserveFocus ? options.focusKey : null;
             if (filteredChannels.length === 0) {
                 channelsBox.innerHTML = `<div class="text-center text-slate-500 mt-10 font-bold">لا توجد قنوات في هذا التصنيف</div>`;
                 return;
@@ -793,13 +836,12 @@
             });
 
             channelsBox.innerHTML = html;
-            channelsBox.scrollTop = 0;
-            if (isInFolder) {
-                focusIndices.channels = 0;
-            } else {
-                focusIndices.channels = 0;
-            }
-            if (focusIndices.channels >= filteredChannels.length + (isInFolder ? 1 : 0)) focusIndices.channels = 0;
+            const restored = restoreChannelFocusKey(previousKey);
+            if (!restored && !options.preserveFocus) focusIndices.channels = 0;
+            const total = filteredChannels.length + (isInFolder ? 1 : 0);
+            if (focusIndices.channels >= total) focusIndices.channels = Math.max(0, total - 1);
+            if (focusIndices.channels < 0) focusIndices.channels = 0;
+            if (!restored) channelsBox.scrollTop = 0;
             updateFocus();
         }
 
@@ -1012,31 +1054,58 @@
         }
 
         // ─── تحديث التركيز ────────────────────────────────────────────────
+        function focusElement(el, className = 'tv-focus', domFocus = true) {
+            if (!el) return;
+            el.classList.add(className);
+            if (domFocus) {
+                if (currentMode !== 'SEARCH' && document.activeElement === searchInput) searchInput.blur();
+                if (currentMode !== 'AUTH' && document.activeElement === authInput) authInput.blur();
+                if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
+                try { el.focus({ preventScroll: true }); } catch (e) { try { el.focus(); } catch (_) {} }
+            }
+        }
+
+        function saveRemoteFocusState(reason = '') {
+            lastRemoteFocusState = { mode: currentMode, focusIndices: { ...focusIndices }, currentCat, isInFolder, channelKey: getChannelFocusKey(), reason };
+        }
+
+        function restoreRemoteFocusState() {
+            if (lastRemoteFocusState) {
+                currentMode = lastRemoteFocusState.mode || currentMode;
+                focusIndices = { ...focusIndices, ...lastRemoteFocusState.focusIndices };
+                if (lastRemoteFocusState.channelKey) restoreChannelFocusKey(lastRemoteFocusState.channelKey);
+            }
+            isSearchEditing = false;
+            if (document.activeElement === searchInput) searchInput.blur();
+            hideKeyboardNative();
+            updateFocus();
+        }
+
         function updateFocus() {
             document.querySelectorAll('.tv-focus, .tv-focus-search, .server-chip.tv-focus, .iframe-btn.tv-focus, .error-btn.tv-focus').forEach(el => {
                 el.classList.remove('tv-focus', 'tv-focus-search');
             });
 
             if (currentMode === 'AUTH') {
-                if (focusIndices.auth === 0) authInput.classList.add('tv-focus-search');
-                else authBtn.classList.add('tv-focus');
+                if (focusIndices.auth === 0) focusElement(authInput, 'tv-focus-search', false);
+                else focusElement(authBtn);
 
             } else if (currentMode === 'MODAL') {
                 const btns = document.querySelectorAll('#server-list .modal-btn');
                 if (btns.length > 0 && focusIndices.modal < btns.length) {
-                    btns[focusIndices.modal].classList.add('tv-focus');
+                    focusElement(btns[focusIndices.modal]);
                 } else {
-                    if (focusIndices.modal === btns.length) document.getElementById('m-fav').classList.add('tv-focus');
-                    else document.getElementById('m-cancel').classList.add('tv-focus');
+                    if (focusIndices.modal === btns.length) focusElement(document.getElementById('m-fav'));
+                    else focusElement(document.getElementById('m-cancel'));
                 }
 
             } else if (currentMode === 'SEARCH') {
-                searchInput.classList.add('tv-focus-search');
+                focusElement(searchInput, 'tv-focus-search', false);
 
             } else if (currentMode === 'CATEGORIES') {
                 const cats = document.querySelectorAll('.category-btn');
                 if (cats[focusIndices.categories]) {
-                    cats[focusIndices.categories].classList.add('tv-focus');
+                    focusElement(cats[focusIndices.categories]);
                     cats[focusIndices.categories].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
                 }
 
@@ -1047,7 +1116,7 @@
                 const elId = (focusIndices.channels === 0 && isInFolder) ? 'back-to-main' : `ch-${focusIndices.channels}`;
                 const el = document.getElementById(elId);
                 if (el) {
-                    el.classList.add('tv-focus');
+                    focusElement(el);
                     const boxTop = channelsBox.scrollTop;
                     const boxBottom = boxTop + channelsBox.clientHeight;
                     const elTop = el.offsetTop;
@@ -1059,32 +1128,32 @@
 
             } else if (currentMode === 'PLAYER_CONTROLS') {
                 const btns = document.querySelectorAll('.player-btn');
-                if (btns[focusIndices.controls]) btns[focusIndices.controls].classList.add('tv-focus');
+                if (btns[focusIndices.controls]) focusElement(btns[focusIndices.controls]);
 
             } else if (currentMode === 'PLAYER_MENU') {
                 const opts = document.querySelectorAll('#qualityMenu .quality-btn');
-                if (opts[focusIndices.menu]) opts[focusIndices.menu].classList.add('tv-focus');
+                if (opts[focusIndices.menu]) focusElement(opts[focusIndices.menu]);
 
             } else if (currentMode === 'PLAYER_SERVERS') {
                 const chips = document.querySelectorAll('#serverMenu .menu-option');
-                if (chips[focusIndices.servers]) chips[focusIndices.servers].classList.add('tv-focus');
+                if (chips[focusIndices.servers]) focusElement(chips[focusIndices.servers]);
 
             } else if (currentMode === 'IFRAME_CONTROLS') {
                 if (!iframeControls.classList.contains('transparent')) {
                     const btns = document.querySelectorAll('.iframe-btn');
-                    if (btns[focusIndices.iframeBtns]) btns[focusIndices.iframeBtns].classList.add('tv-focus');
+                    if (btns[focusIndices.iframeBtns]) focusElement(btns[focusIndices.iframeBtns]);
                 }
 
             } else if (currentMode === 'ERROR_MODAL') {
                 const btns = document.querySelectorAll('.error-btn');
-                if (btns[focusIndices.errorBtns]) btns[focusIndices.errorBtns].classList.add('tv-focus');
+                if (btns[focusIndices.errorBtns]) focusElement(btns[focusIndices.errorBtns]);
 
             } else if (currentMode === 'SERVER_SELECTION') {
                 const chips = document.querySelectorAll('.server-chip');
                 if (chips.length > 0) {
                     if (focusIndices.serverChips >= chips.length) focusIndices.serverChips = chips.length - 1;
                     if (focusIndices.serverChips < 0) focusIndices.serverChips = 0;
-                    chips[focusIndices.serverChips].classList.add('tv-focus');
+                    focusElement(chips[focusIndices.serverChips]);
                     chips[focusIndices.serverChips].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
                 }
 
@@ -1116,6 +1185,13 @@
                 // نترك المعالجة الطبيعية
             }
 
+            if (document.activeElement === searchInput && isSearchEditing && ['ArrowDown','ArrowUp'].includes(key)) {
+                e.preventDefault();
+                leaveTextInputFocus();
+                currentMode = key === 'ArrowDown' && filteredChannels.length > 0 ? 'CHANNELS' : 'CATEGORIES';
+                updateFocus();
+                return;
+            }
             if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(key)) e.preventDefault();
             if (key === ' ' && document.activeElement !== searchInput) e.preventDefault();
 
@@ -1193,9 +1269,22 @@
             updateFocus();
         }
 
+        function leaveTextInputFocus() {
+            isSearchEditing = false;
+            searchInput.blur();
+            hideKeyboardNative();
+        }
+
         function handleSearchNav(key) {
-            if      (key === 'ArrowDown') { searchInput.blur(); hideKeyboardNative(); currentMode = 'CATEGORIES'; updateFocus(); }
-            else if (key === 'Enter')     { searchInput.focus(); showKeyboardNative(); }
+            if (key === 'ArrowDown') {
+                leaveTextInputFocus();
+                currentMode = filteredChannels.length > 0 ? 'CHANNELS' : 'CATEGORIES';
+                updateFocus();
+            } else if (key === 'Enter' || key === ' ') {
+                isSearchEditing = true;
+                searchInput.focus();
+                showKeyboardNative();
+            }
         }
 
         // WebView لا يُظهر لوحة المفاتيح البرمجية بشكل موثوق دائماً عند تركيز حقل نصي
@@ -1626,7 +1715,7 @@
             document.querySelectorAll('#channelsBox .tv-focus').forEach(el => el.classList.remove('tv-focus'));
             const el = document.getElementById('xt-' + focusIndices.xtream);
             if (el) {
-                el.classList.add('tv-focus');
+                focusElement(el);
                 const boxTop = channelsBox.scrollTop;
                 const boxBottom = boxTop + channelsBox.clientHeight;
                 const elTop = el.offsetTop;
@@ -2524,6 +2613,7 @@
             if (!url) return;
             if (window.AndroidPlayer && typeof window.AndroidPlayer.playInVlc === 'function') {
                 try {
+                    saveRemoteFocusState('vlc');
                     window.AndroidPlayer.playInVlc(url, name || '');
                     showStatus('▶️ جاري فتح VLC...');
                 } catch (e) {
@@ -3090,7 +3180,7 @@
         });
 
         searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') { searchInput.blur(); hideKeyboardNative(); currentMode = 'CATEGORIES'; updateFocus(); }
+            if (e.key === 'Escape') { leaveTextInputFocus(); currentMode = 'CATEGORIES'; updateFocus(); }
         });
 
         // ─── تشغيل ────────────────────────────────────────────────────────
@@ -3099,9 +3189,9 @@
         // (MainActivity يُعيد طلب تركيز WebView صراحة)، لكن نُضيف هنا أيضاً إعادة رسم
         // مؤشر التركيز (tv-focus) صراحة عند استعادة الصفحة تركيزها/ظهورها من جديد،
         // كطبقة حماية إضافية بغض النظر عن سبب فقدانه.
-        window.addEventListener('focus', () => { if (typeof updateFocus === 'function') updateFocus(); });
+        window.addEventListener('focus', () => { if (typeof restoreRemoteFocusState === 'function') restoreRemoteFocusState(); });
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && typeof updateFocus === 'function') updateFocus();
+            if (!document.hidden && typeof restoreRemoteFocusState === 'function') restoreRemoteFocusState();
         });
 
         window.onload = checkAuth;

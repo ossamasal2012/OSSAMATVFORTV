@@ -20,6 +20,7 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
+        buildConfigField "String", "UPDATE_JSON_URL", '"https://github.com/ossamasal2012/OSSAMATVFORTV/releases/latest/download/version.json"'
     }
 
     if (hasReleaseSigning) {
@@ -55,6 +56,15 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    buildFeatures {
+        buildConfig true
+    }
+
     // لا نُدرج أي مكتبات AndroidX/UI ثقيلة — التطبيق كله WebView واحد بلا تخطيطات XML
     // إضافية ولا مكونات Material، حفاظاً على أقصى خفة ممكنة لحجم الـ APK النهائي.
+}
+
+
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
 }
