@@ -11,13 +11,14 @@ import android.webkit.WebView;
 import android.widget.Toast;
 
 /**
- * جسر جافاسكريبت ↔ أندرويد لهذا التطبيق. مسؤول عن أمرين فقط بالضبط بحسب الحاجة
- * الفعلية للصفحة:
+ * جسر جافاسكريبت ↔ أندرويد لهذا التطبيق. مسؤول عن:
  *  1) فتح أي رابط فيديو مباشرة بتطبيق VLC الخارجي (playInVlc) — هو التطبيق الوحيد
  *     المسؤول عن التشغيل الفعلي لكل محتوى الفيديو بهذا التطبيق الآن.
  *  2) إظهار/إخفاء لوحة المفاتيح البرمجية صراحة عند استخدام حقل البحث
  *     (showKeyboard/hideKeyboard)، لأن WebView لا يُظهرها بشكل موثوق دائماً عند
  *     تركيز حقل نصي عبر استدعاء .focus() من جافاسكريبت (بخلاف لمسة مستخدم حقيقية).
+ *  3) تفويض كل شيء متعلق بتحديث التطبيق OTA لصف UpdateManager المخصَّص لذلك
+ *     (فحص الإصدار، تنزيل الـAPK بتقدّم حي، فتح المثبّت، صلاحية المصادر غير المعروفة).
  *
  * كل استدعاء @JavascriptInterface يصل على خيط WebView الداخلي (ليس بالضرورة خيط
  * الواجهة الرئيسي)، لذا كل عملية تؤثر على الواجهة هنا مُغلَّفة بـrunOnUiThread صراحة.
@@ -28,10 +29,12 @@ public class WebAppInterface {
 
     private final Activity activity;
     private final WebView webView;
+    private final UpdateManager updateManager;
 
     public WebAppInterface(Activity activity, WebView webView) {
         this.activity = activity;
         this.webView = webView;
+        this.updateManager = new UpdateManager(activity, webView);
     }
 
     /**
@@ -109,5 +112,50 @@ public class WebAppInterface {
                 imm.hideSoftInputFromWindow(webView.getWindowToken(), 0);
             }
         });
+    }
+
+    // ─────────────────────── تحديث التطبيق OTA ───────────────────────
+    // كل هذه الدوال تفويض رفيع فقط لصف UpdateManager — راجع تعليقاته للتفاصيل
+    // الكاملة (لا يوجد أي منطق فعلي هنا عمداً، حفاظاً على وضوح فصل المسؤوليات).
+
+    /** يتحقق من وجود إصدار أحدث بصمت؛ يستدعي window.onUpdateAvailable(...) بجافاسكريبت فقط إن وُجد فعلاً. */
+    @JavascriptInterface
+    public void checkForUpdate() {
+        updateManager.checkForUpdate();
+    }
+
+    /** يبدأ تنزيل ملف الـAPK بالخلفية مع تقرير تقدّم حي لجافاسكريبت، ثم يفتح المثبّت تلقائياً عند الاكتمال. */
+    @JavascriptInterface
+    public void startUpdateDownload(final String apkUrl) {
+        updateManager.startDownload(apkUrl);
+    }
+
+    /** يُلغي تنزيلاً جارياً (مثلاً عند ضغط المستخدم زر الرجوع أثناء التحميل) ويحذف أي ملف جزئي. */
+    @JavascriptInterface
+    public void cancelUpdateDownload() {
+        updateManager.cancelDownload();
+    }
+
+    /** يفتح مثبّت أندرويد الرسمي لآخر ملف APK تم تنزيله بنجاح (يُستخدم تلقائياً وكزر "إعادة المحاولة" يدوي أيضاً). */
+    @JavascriptInterface
+    public void installDownloadedApk() {
+        updateManager.installDownloadedApk();
+    }
+
+    /** true إن كان بإمكان التطبيق حالياً تشغيل مثبّت حزم أندرويد (صلاحية "تثبيت من مصادر غير معروفة"). */
+    @JavascriptInterface
+    public boolean canInstallUnknownApps() {
+        return updateManager.canInstallUnknownApps();
+    }
+
+    /** يفتح شاشة إعدادات أندرويد لمنح صلاحية "تثبيت من مصادر غير معروفة" لهذا التطبيق تحديداً. */
+    @JavascriptInterface
+    public void openInstallPermissionSettings() {
+        updateManager.openInstallPermissionSettings();
+    }
+
+    /** يُستدعى من MainActivity.onDestroy() لإيقاف أي عملية تنزيل/فحص خلفية بأمان. */
+    void shutdown() {
+        updateManager.shutdown();
     }
 }
