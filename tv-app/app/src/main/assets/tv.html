@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -32,6 +31,33 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+
+        /* ============================================================
+           🔧 التحكم المركزي بحجم كامل واجهة التطبيق (UI Scale)
+           ============================================================
+           مكان واحد فقط للتحكم بحجم كل شيء بالتطبيق دفعة واحدة: النصوص،
+           الأزرار، البطاقات، المسافات (Padding/Margin)، الصور... كل شيء
+           بالتناسب، دون الحاجة لتعديل أي عنصر آخر بالكود على الإطلاق.
+
+           كيف تعمل: خاصية CSS القياسية "zoom" على عنصر <html> الجذر تعيد
+           حساب كل التخطيط (Layout) بنفس نسبة القيمة أدناه — تماماً كما لو
+           كبّرت أو صغّرت "تكبير الصفحة" (Zoom) من متصفح، وليس مجرد تصغير
+           بصري للمعاينة فقط. هذا يضمن أن العناصر تصغر فعلياً ويظهر عدد
+           أكبر منها على الشاشة، بلا أي تأثير سلبي على تموضع الأزرار.
+
+           القيمة الحالية 0.8 = 80% من الحجم الطبيعي (كان التطبيق يعمل تقريباً
+           بحجم 150% قبل هذا الإصلاح، أي كانت العناصر أكبر بكثير من اللازم
+           لشاشة تلفاز يُشاهَد من مسافة، مع مساحة ضائعة كبيرة على الشاشة).
+
+           للتكبير قليلاً: غيّر القيمة إلى 0.9 أو 1
+           للتصغير أكثر:   غيّر القيمة إلى 0.7 أو 0.65
+           (القيمة 1 = الحجم "الطبيعي" الافتراضي لعناصر Tailwind قبل أي تصغير) */
+        :root {
+            --ui-scale: 0.8;
+        }
+        html {
+            zoom: var(--ui-scale);
+        }
 
         body {
             font-family: 'Tajawal', sans-serif;
@@ -91,6 +117,29 @@
             background: #1e293b; border: 2px solid transparent; cursor: pointer;
         }
         .modal-btn.tv-focus { background: #10b981 !important; color: #fff; border-color: #34d399 !important; transform: scale(1.02); }
+
+        /* ─── نافذة تحديث التطبيق (OTA) ────────────────────────────────── */
+        #update-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 9600;
+            display: none; align-items: center; justify-content: center;
+        }
+        #update-modal.active { display: flex !important; }
+        .update-version-row {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #0b1220; border: 1px solid #1e293b; border-radius: 12px;
+            padding: 10px 14px; margin: 6px 0; font-size: 0.85rem; color: #94a3b8;
+        }
+        .update-version-row b { color: #e2e8f0; font-size: 0.95rem; }
+        .update-progress-track {
+            width: 100%; height: 14px; background: #1e293b; border-radius: 999px;
+            overflow: hidden; margin: 16px 0 8px; border: 1px solid #334155;
+        }
+        .update-progress-fill {
+            height: 100%; width: 0%; background: linear-gradient(90deg,#10b981,#34d399);
+            transition: width 0.25s ease; border-radius: 999px;
+        }
+        .update-progress-label { font-size: 0.8rem; color: #94a3b8; display: flex; justify-content: space-between; }
+        .update-btn-primary.tv-focus { background: #10b981 !important; color: #022c22 !important; border-color: #34d399 !important; transform: scale(1.02); }
 
         #player-container {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -320,7 +369,7 @@
         .error-btn.exit-btn.tv-focus { background: #ef4444 !important; border-color: #f87171 !important; }
     </style>
 </head>
-<body>
+<body tabindex="-1">
 
     <!-- شاشة تسجيل الدخول -->
     <div id="auth-screen">
@@ -329,7 +378,7 @@
             <p class="text-slate-400">يرجى إدخال الرمز السري للتفعيل</p>
         </div>
         <div class="w-full max-w-md px-6">
-            <input type="password" id="authInput" placeholder="أدخل الرمز هنا..."
+            <input type="password" id="authInput" tabindex="-1" placeholder="أدخل الرمز هنا..."
                 class="w-full bg-slate-900 border-2 border-slate-800 rounded-2xl py-5 px-6 text-2xl text-center focus:outline-none text-emerald-400 placeholder:text-slate-700 tracking-widest mb-6 transition-all">
             <button id="authBtn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-2xl text-xl shadow-lg shadow-emerald-900/20 transition-all border-b-4 border-emerald-800">تفعيل التطبيق</button>
             <p id="authError" class="text-red-500 text-center mt-4 font-bold hidden">الرمز السري غير صحيح!</p>
@@ -346,6 +395,31 @@
         </div>
     </div>
 
+    <!-- نافذة تحديث التطبيق (OTA) -->
+    <div id="update-modal">
+        <div class="modal-content" style="max-width: 440px;">
+            <h2 class="text-lg font-black text-white mb-1">🚀 يتوفر إصدار جديد من تطبيق يلا گول</h2>
+            <p id="update-notes" class="text-slate-400 mb-3" style="font-size:0.8rem;"></p>
+
+            <div id="update-prompt-view">
+                <div class="update-version-row"><span>الإصدار الحالي</span><b id="update-current-version">-</b></div>
+                <div class="update-version-row"><span>الإصدار الجديد</span><b id="update-new-version">-</b></div>
+                <button id="update-btn-now" class="modal-btn update-btn-primary" style="margin-top:14px;">⬇️ تحديث الآن</button>
+                <button id="update-btn-later" class="modal-btn">⏰ لاحقاً</button>
+            </div>
+
+            <div id="update-progress-view" style="display:none;">
+                <p id="update-progress-status" class="text-slate-300 font-bold" style="font-size:0.85rem;">جاري تحميل التحديث...</p>
+                <div class="update-progress-track"><div id="update-progress-fill" class="update-progress-fill"></div></div>
+                <div class="update-progress-label">
+                    <span id="update-progress-percent">0%</span>
+                    <span id="update-progress-bytes"></span>
+                </div>
+                <button id="update-btn-retry-install" class="modal-btn update-btn-primary" style="display:none; margin-top:14px;">📲 فتح المثبت</button>
+            </div>
+        </div>
+    </div>
+
     <!-- الواجهة الرئيسية -->
     <div id="main-app" class="flex flex-col h-full w-full hidden">
         <aside class="w-full h-full flex flex-col bg-slate-950 border-l border-slate-900 z-50">
@@ -357,7 +431,7 @@
             <div class="p-4 border-b border-slate-900 shrink-0">
                 <div class="relative">
                     <i class="fa-solid fa-magnifying-glass absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-                    <input type="text" id="searchInput" placeholder="ابحث عن قناة (اضغط OK للكتابة)"
+                    <input type="text" id="searchInput" tabindex="-1" placeholder="ابحث عن قناة (اضغط OK للكتابة)"
                         class="w-full bg-slate-900 border-2 border-slate-800 rounded-xl py-3 px-4 pr-10 text-sm focus:outline-none text-white placeholder:text-slate-500 transition-all">
                 </div>
             </div>
@@ -501,7 +575,7 @@
 
         const SECRET_CODE = "ossamatt22";
 
-        let focusIndices = { auth: 0, channels: 0, categories: 0, controls: 0, menu: 0, modal: 0, servers: 0, iframeBtns: 0, errorBtns: 0, serverChips: 0, xtream: 0 };
+        let focusIndices = { auth: 0, channels: 0, categories: 0, controls: 0, menu: 0, modal: 0, servers: 0, iframeBtns: 0, errorBtns: 0, serverChips: 0, xtream: 0, update: 0 };
 
         // ─── العناصر ──────────────────────────────────────────────────────
         const authScreen      = document.getElementById('auth-screen');
@@ -529,6 +603,7 @@
         const errorModal      = document.getElementById('error-modal');
         const errorText       = document.getElementById('error-text');
         const errorButtons    = document.getElementById('error-buttons');
+        const updateModal     = document.getElementById('update-modal');
 
         const aspectModes  = ['fit', 'fill', 'zoom'];
         const aspectLabels = ['Fit', 'Fill', 'Zoom'];
@@ -601,6 +676,177 @@
             mainApp.classList.remove('hidden');
             currentMode = 'CHANNELS';
             loadChannels();
+            checkForAppUpdate();
+        }
+
+        // ============================================================
+        //  🚀 تحديث التطبيق OTA
+        // ============================================================
+        // ملاحظة تقنية مهمّة: التحقق من الإصدار (قراءة version.json) يُنفَّذ بالكامل
+        // من كود جافا (UpdateManager عبر جسر AndroidPlayer)، وليس بـ fetch() هنا.
+        // السبب: version.json وملف الـAPK يُنشَران كمرفقات ضمن GitHub Release
+        // (روابط releases/latest/download/...)، وهذه الروابط لا تُرسِل ترويسة CORS
+        // (Access-Control-Allow-Origin) المطلوبة كي ينجح fetch() من صفحة ويب —
+        // خلافاً لـ raw.githubusercontent.com المستخدم لبقية بيانات التطبيق (والذي
+        // يُرسِل هذه الترويسة فعلاً، لذا fetch() يعمل معه بلا أي مشكلة). كود جافا
+        // الأصلي لا يتأثر بهذا القيد إطلاقاً لأنه ليس متصفحاً. لذا: "القراءة عبر
+        // الشبكة" (فحص الإصدار + تنزيل الـAPK) من جافا، بينما واجهة نافذة التحديث
+        // بالكامل (تصميم، ألوان، تنقّل الريموت) تبقى هنا بجافاسكريبت مطابقة تماماً
+        // لبقية شاشات التطبيق ولنفس نظام currentMode/focusIndices/updateFocus.
+        let pendingUpdateInfo = null;
+        let modeBeforeUpdateModal = 'CHANNELS';
+        let isUpdateDownloading = false;
+
+        // الشاشات "الآمنة" لإظهار نافذة التحديث فوراً دون مقاطعة تشغيل نشط —
+        // إن كان المستخدم يشاهد قناة الآن، نُؤجِّل العرض حتى يعود لتصفّح القنوات
+        // (راجع closePlayer أدناه).
+        function isSafeToShowUpdatePrompt() {
+            return BROWSE_MODES.includes(currentMode) ||
+                   currentMode === 'CATEGORIES' || currentMode === 'SEARCH' || currentMode === 'MODAL';
+        }
+
+        function checkForAppUpdate() {
+            try {
+                if (window.AndroidPlayer && typeof window.AndroidPlayer.checkForUpdate === 'function') {
+                    window.AndroidPlayer.checkForUpdate();
+                }
+            } catch (e) {
+                // التحقق من التحديث ليس حرجاً أبداً لعمل التطبيق — أي خطأ هنا يُتجاهل بصمت
+                // ويستمر التطبيق بالعمل بشكل طبيعي تماماً.
+            }
+        }
+
+        // تُستدعى من كود جافا (UpdateManager) فقط عندما يتأكد فعلاً وجود إصدار
+        // أحدث من الإصدار المثبَّت حالياً على الجهاز — لا استدعاء إطلاقاً غير ذلك.
+        window.onUpdateAvailable = function (payloadJson) {
+            try {
+                const data = JSON.parse(payloadJson);
+                if (!data || typeof data.versionCode !== 'number') return;
+                pendingUpdateInfo = {
+                    versionCode: data.versionCode,
+                    versionName: (data.versionName != null && data.versionName !== '') ? String(data.versionName) : String(data.versionCode),
+                    apkUrl: typeof data.apkUrl === 'string' ? data.apkUrl : '',
+                    forceUpdate: data.forceUpdate === true,
+                    notes: typeof data.notes === 'string' ? data.notes : '',
+                    localVersionName: data.localVersionName || ''
+                };
+                showUpdatePrompt();
+            } catch (e) {
+                console.warn('تعذّر قراءة بيانات التحديث المُرسَلة من جافا:', e);
+            }
+        };
+
+        function showUpdatePrompt() {
+            if (!pendingUpdateInfo) return;
+            if (!isSafeToShowUpdatePrompt() && !updateModal.classList.contains('active')) {
+                return; // سنُحاول العرض تلقائياً مرة أخرى عند العودة لتصفّح القنوات
+            }
+            modeBeforeUpdateModal = (currentMode === 'UPDATE_PROMPT' || currentMode === 'UPDATE_PROGRESS')
+                ? modeBeforeUpdateModal : currentMode;
+            document.getElementById('update-current-version').textContent = pendingUpdateInfo.localVersionName || '-';
+            document.getElementById('update-new-version').textContent = pendingUpdateInfo.versionName;
+            document.getElementById('update-notes').textContent =
+                pendingUpdateInfo.notes.trim() !== '' ? pendingUpdateInfo.notes : 'يتضمّن هذا الإصدار تحسينات وإصلاحات لاستقرار التطبيق.';
+            document.getElementById('update-btn-later').style.display = pendingUpdateInfo.forceUpdate ? 'none' : 'block';
+            document.getElementById('update-prompt-view').style.display = 'block';
+            document.getElementById('update-progress-view').style.display = 'none';
+            document.getElementById('update-btn-retry-install').style.display = 'none';
+            focusIndices.update = 0;
+            currentMode = 'UPDATE_PROMPT';
+            updateModal.classList.add('active');
+            updateFocus();
+        }
+
+        function dismissUpdatePrompt() {
+            if (pendingUpdateInfo && pendingUpdateInfo.forceUpdate) return; // تحديث إجباري: لا يُغلَق
+            updateModal.classList.remove('active');
+            currentMode = modeBeforeUpdateModal || 'CHANNELS';
+            updateFocus();
+        }
+
+        function startAppUpdateDownload() {
+            if (!pendingUpdateInfo || !pendingUpdateInfo.apkUrl) {
+                showStatus('⚠️ رابط التحديث غير متوفر حالياً');
+                return;
+            }
+            if (isUpdateDownloading) return;
+            if (!window.AndroidPlayer || typeof window.AndroidPlayer.startUpdateDownload !== 'function') {
+                showStatus('⚠️ التحديث التلقائي غير مدعوم في هذه البيئة');
+                return;
+            }
+            isUpdateDownloading = true;
+            document.getElementById('update-prompt-view').style.display = 'none';
+            document.getElementById('update-progress-view').style.display = 'block';
+            document.getElementById('update-btn-retry-install').style.display = 'none';
+            document.getElementById('update-progress-status').textContent = 'جاري تحميل التحديث...';
+            document.getElementById('update-progress-fill').style.width = '0%';
+            document.getElementById('update-progress-percent').textContent = '0%';
+            document.getElementById('update-progress-bytes').textContent = '';
+            focusIndices.update = 0;
+            currentMode = 'UPDATE_PROGRESS';
+            updateFocus();
+            window.AndroidPlayer.startUpdateDownload(pendingUpdateInfo.apkUrl);
+        }
+
+        function formatUpdateBytes(bytes) {
+            if (!bytes || bytes <= 0) return '0 MB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // ─── نداءات ترد من كود جافا (WebAppInterface/UpdateManager) أثناء التحميل ───
+        window.onUpdateDownloadProgress = function (downloaded, total) {
+            const pct = total > 0 ? Math.max(0, Math.min(100, Math.round((downloaded / total) * 100))) : 0;
+            const fill = document.getElementById('update-progress-fill');
+            const pctEl = document.getElementById('update-progress-percent');
+            const bytesEl = document.getElementById('update-progress-bytes');
+            if (fill) fill.style.width = pct + '%';
+            if (pctEl) pctEl.textContent = pct + '%';
+            if (bytesEl) bytesEl.textContent = total > 0
+                ? (formatUpdateBytes(downloaded) + ' / ' + formatUpdateBytes(total))
+                : (formatUpdateBytes(downloaded) + ' تم تنزيلها');
+        };
+
+        window.onUpdateDownloadComplete = function () {
+            isUpdateDownloading = false;
+            const statusEl = document.getElementById('update-progress-status');
+            if (statusEl) statusEl.textContent = '✅ اكتمل التحميل، يتم فتح المثبّت...';
+            const fill = document.getElementById('update-progress-fill');
+            if (fill) fill.style.width = '100%';
+            const pctEl = document.getElementById('update-progress-percent');
+            if (pctEl) pctEl.textContent = '100%';
+            const retryBtn = document.getElementById('update-btn-retry-install');
+            if (retryBtn) retryBtn.style.display = 'block';
+            focusIndices.update = 0;
+            if (currentMode === 'UPDATE_PROGRESS') updateFocus();
+        };
+
+        window.onUpdateDownloadFailed = function (message) {
+            isUpdateDownloading = false;
+            const statusEl = document.getElementById('update-progress-status');
+            if (statusEl) statusEl.textContent = '⚠️ ' + (message || 'فشل تحميل التحديث. تحقق من الإنترنت والمساحة المتوفرة.');
+        };
+
+        function handleUpdateNav(key) {
+            if (currentMode === 'UPDATE_PROMPT') {
+                const laterVisible = !(pendingUpdateInfo && pendingUpdateInfo.forceUpdate);
+                const max = laterVisible ? 1 : 0;
+                if (key === 'ArrowDown') focusIndices.update = Math.min(focusIndices.update + 1, max);
+                else if (key === 'ArrowUp') focusIndices.update = Math.max(focusIndices.update - 1, 0);
+                else if (key === 'Enter' || key === ' ') {
+                    if (focusIndices.update === 0) startAppUpdateDownload();
+                    else dismissUpdatePrompt();
+                    return;
+                }
+                updateFocus();
+            } else if (currentMode === 'UPDATE_PROGRESS') {
+                if (key === 'Enter' || key === ' ') {
+                    const retryBtn = document.getElementById('update-btn-retry-install');
+                    if (retryBtn && retryBtn.style.display !== 'none' &&
+                        window.AndroidPlayer && typeof window.AndroidPlayer.installDownloadedApk === 'function') {
+                        window.AndroidPlayer.installDownloadedApk();
+                    }
+                }
+            }
         }
 
         // ─── تحميل القنوات ──────────────────────────────────────────────
@@ -794,12 +1040,15 @@
 
             channelsBox.innerHTML = html;
             channelsBox.scrollTop = 0;
-            if (isInFolder) {
-                focusIndices.channels = 0;
-            } else {
-                focusIndices.channels = 0;
-            }
-            if (focusIndices.channels >= filteredChannels.length + (isInFolder ? 1 : 0)) focusIndices.channels = 0;
+            // ملاحظة: لا نُصفِّر focusIndices.channels هنا بشكل مطلق — الأماكن التي
+            // تريد فعلاً البدء من أول عنصر (تبديل تصنيف، الرجوع للقائمة الرئيسية،
+            // كتابة نص بحث جديد) تُصفِّره صراحة بنفسها قبل استدعاء هذه الدالة. هنا
+            // فقط "نُثبِّت" الفهرس ضمن الحدود الصحيحة إن أصبحت القائمة الجديدة أقصر
+            // من الفهرس الحالي (مثلاً بعد إزالة قناة من المفضلة وهي آخر عنصر بالقائمة)
+            // بدل إعادة ضبطه للصفر دائماً وفقدان مكان المستخدم بلا داعٍ (مثلاً عند
+            // مجرد تبديل حالة "المفضلة" لقناة في منتصف قائمة طويلة).
+            const totalNow = filteredChannels.length + (isInFolder ? 1 : 0);
+            if (focusIndices.channels >= totalNow || focusIndices.channels < 0) focusIndices.channels = Math.max(0, totalNow - 1);
             updateFocus();
         }
 
@@ -1011,8 +1260,58 @@
             playChannel(errorChannelRef, serverIndex);
         }
 
+        // ─── حارس التركيز الحقيقي (Real DOM Focus) على مستوى كل التطبيق ─────
+        // المشكلة الجذرية وراء "OK يفتح البحث بدل العنصر المُحدَّد": نظام التنقل
+        // بالريموت بالكامل (currentMode + focusIndices + كلاس tv-focus البصري) هو
+        // نظام "منطقي" خاص بنا فقط، منفصل تماماً عن مفهوم "التركيز الحقيقي"
+        // (document.activeElement) الذي يديره محرك WebView نفسه. في الوضع الطبيعي
+        // هذا غير مهم لأن كل عناصرنا (قنوات/تصنيفات/أزرار) هي <div>/<button> لا
+        // نُركِّز عليها حقيقياً أبداً — نُلوِّنها بصرياً فقط عبر tv-focus. لكن حقلي
+        // الإدخال النصي (البحث وكلمة السر) يحتاجان تركيزاً حقيقياً فعلاً لاستقبال
+        // الكتابة. المشكلة: محرك WebView على أندرويد قد "يقرر" من تلقاء نفسه منح
+        // هذا التركيز الحقيقي لأحد هذين الحقلين (أول عنصر قابل للتركيز فعلياً في
+        // الصفحة) في لحظات معينة خارج سيطرتنا تماماً — أبرزها عند استرجاع تركيز
+        // الـWebView بعد العودة من نشاط خارجي (VLC)، ما يجعل ضغطة OK التالية تصل
+        // فعلياً لحقل البحث (فيفتح لوحة المفاتيح) بدل العنصر الذي نعرضه بصرياً
+        // كمُحدَّد. هذا الحارس يضمن أن التركيز الحقيقي لا يكون أبداً على حقل نصي
+        // إلا حين نطلبه نحن صراحة عبر focusInputIntentionally أدناه (بالضبط نفس
+        // الأسلوب المُثبَت أصلاً بالكود لمنع الـiframe من سرقة التركيز، معمَّم هنا
+        // على كامل التطبيق) — ونُعيده لصفحتنا (document.body) فوراً في أي حالة أخرى.
+        let intentionalFocusTarget = null;
+
+        function focusInputIntentionally(el) {
+            if (!el) return;
+            intentionalFocusTarget = el;
+            el.setAttribute('tabindex', '0');
+            el.focus();
+        }
+
+        function blurInputIntentionally(el) {
+            if (!el) return;
+            if (intentionalFocusTarget === el) intentionalFocusTarget = null;
+            el.blur();
+            el.setAttribute('tabindex', '-1');
+        }
+
+        function sanitizeDomFocus() {
+            const active = document.activeElement;
+            if (!active || active === document.body) return;
+            if (active === intentionalFocusTarget) return; // تركيز مقصود وصحيح حالياً — لا تلمسه
+            // أي عنصر آخر يحمل تركيزاً حقيقياً الآن (حقل بحث/سر لم نطلبه نحن، iframe،
+            // أو أي عنصر آخر) هو تركيز "شارد" بغض النظر عن السبب — نُعيده لصفحتنا فوراً.
+            if (active === searchInput) { searchInput.setAttribute('tabindex', '-1'); }
+            if (active === authInput)   { authInput.setAttribute('tabindex', '-1'); }
+            if (typeof active.blur === 'function') { try { active.blur(); } catch (e) {} }
+            try { document.body.focus(); } catch (e) {}
+        }
+
         // ─── تحديث التركيز ────────────────────────────────────────────────
         function updateFocus() {
+            // نُطهِّر التركيز الحقيقي أولاً في كل مرة (انظر الشرح أعلاه)، ثم نرسم
+            // مؤشر التركيز البصري (tv-focus) الصحيح حسب currentMode كالمعتاد. هذا
+            // يجعل الحماية تعمل تلقائياً في كل نقطة بالتطبيق تقريباً، لأن updateFocus
+            // تُستدعى بعد كل انتقال حالة أو رسم واجهة تقريباً بلا استثناء.
+            sanitizeDomFocus();
             document.querySelectorAll('.tv-focus, .tv-focus-search, .server-chip.tv-focus, .iframe-btn.tv-focus, .error-btn.tv-focus').forEach(el => {
                 el.classList.remove('tv-focus', 'tv-focus-search');
             });
@@ -1091,6 +1390,16 @@
             } else if (currentMode === 'XTREAM_LIST' || currentMode === 'XTREAM_HOME' || currentMode === 'XTREAM_CATS' ||
                        currentMode === 'XTREAM_CONTENT' || currentMode === 'XTREAM_SERIES' || currentMode === 'XTREAM_EPISODES') {
                 updateXtreamFocus();
+
+            } else if (currentMode === 'UPDATE_PROMPT') {
+                const laterBtn = document.getElementById('update-btn-later');
+                const laterVisible = laterBtn && laterBtn.style.display !== 'none';
+                if (focusIndices.update === 1 && laterVisible) laterBtn.classList.add('tv-focus');
+                else document.getElementById('update-btn-now').classList.add('tv-focus');
+
+            } else if (currentMode === 'UPDATE_PROGRESS') {
+                const retryBtn = document.getElementById('update-btn-retry-install');
+                if (retryBtn && retryBtn.style.display !== 'none') retryBtn.classList.add('tv-focus');
             }
         }
 
@@ -1149,13 +1458,14 @@
             else if (currentMode === 'XTREAM_CONTENT')  handleXtreamContentNav(key);
             else if (currentMode === 'XTREAM_SERIES')   handleXtreamSeriesNav(key);
             else if (currentMode === 'XTREAM_EPISODES') handleXtreamEpisodesNav(key);
+            else if (currentMode === 'UPDATE_PROMPT' || currentMode === 'UPDATE_PROGRESS') handleUpdateNav(key);
         });
 
         function handleAuthNav(key) {
-            if      (key === 'ArrowDown') { focusIndices.auth = 1; authInput.blur(); }
+            if      (key === 'ArrowDown') { focusIndices.auth = 1; blurInputIntentionally(authInput); }
             else if (key === 'ArrowUp')   { focusIndices.auth = 0; }
             else if (key === 'Enter' || key === ' ') {
-                if (focusIndices.auth === 0) authInput.focus();
+                if (focusIndices.auth === 0) focusInputIntentionally(authInput);
                 else handleAuth();
             }
             updateFocus();
@@ -1194,8 +1504,8 @@
         }
 
         function handleSearchNav(key) {
-            if      (key === 'ArrowDown') { searchInput.blur(); hideKeyboardNative(); currentMode = 'CATEGORIES'; updateFocus(); }
-            else if (key === 'Enter')     { searchInput.focus(); showKeyboardNative(); }
+            if      (key === 'ArrowDown') { blurInputIntentionally(searchInput); hideKeyboardNative(); currentMode = 'CATEGORIES'; updateFocus(); }
+            else if (key === 'Enter')     { focusInputIntentionally(searchInput); showKeyboardNative(); }
         }
 
         // WebView لا يُظهر لوحة المفاتيح البرمجية بشكل موثوق دائماً عند تركيز حقل نصي
@@ -1334,6 +1644,22 @@
             else if (currentMode === 'XTREAM_LIST' || currentMode === 'XTREAM_HOME' || currentMode === 'XTREAM_CATS' ||
                      currentMode === 'XTREAM_CONTENT' || currentMode === 'XTREAM_SERIES' || currentMode === 'XTREAM_EPISODES') {
                 xtreamGoBack();
+            }
+            else if (currentMode === 'UPDATE_PROMPT') {
+                dismissUpdatePrompt(); // لا يُغلَق فعلياً إن كان التحديث إجبارياً (تُعالَج الحماية داخل الدالة)
+            }
+            else if (currentMode === 'UPDATE_PROGRESS') {
+                const installReady = document.getElementById('update-btn-retry-install').style.display !== 'none';
+                if (!installReady && isUpdateDownloading) {
+                    // إلغاء تحميل جارٍ والعودة لنافذة الاختيار — لا يُترَك المستخدم عالقاً بلا رجوع
+                    if (window.AndroidPlayer && typeof window.AndroidPlayer.cancelUpdateDownload === 'function') {
+                        window.AndroidPlayer.cancelUpdateDownload();
+                    }
+                    isUpdateDownloading = false;
+                    showUpdatePrompt();
+                }
+                // إن اكتمل التحميل فعلاً (زر "فتح المثبت" ظاهر)، الرجوع هنا لا يفعل شيئاً —
+                // التحديث الإجباري تحديداً يبقى مطلوباً حتى يُثبَّت فعلياً عبر ذلك الزر.
             }
         }
 
@@ -2879,6 +3205,10 @@
             // معه من جديد دون أي إعادة رسم أو طلب شبكة إضافي.
             currentMode = modeBeforePlayer || 'CHANNELS';
             updateFocus();
+            // إن كان هناك تحديث مُتاح تأجَّل عرضه لأن المستخدم كان يشاهد قناة، نعرضه الآن.
+            if (pendingUpdateInfo && !updateModal.classList.contains('active')) {
+                showUpdatePrompt();
+            }
         }
 
         function setupQualityMenu() {
@@ -3090,7 +3420,7 @@
         });
 
         searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') { searchInput.blur(); hideKeyboardNative(); currentMode = 'CATEGORIES'; updateFocus(); }
+            if (e.key === 'Escape') { blurInputIntentionally(searchInput); hideKeyboardNative(); currentMode = 'CATEGORIES'; updateFocus(); }
         });
 
         // ─── تشغيل ────────────────────────────────────────────────────────
