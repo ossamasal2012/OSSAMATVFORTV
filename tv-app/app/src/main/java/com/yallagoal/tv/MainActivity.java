@@ -16,13 +16,15 @@ import android.webkit.WebViewClient;
 /**
  * غلاف أندرويد رفيع حول tv.html. مسؤولياته الأساسية:
  *  1) WebView واحد بإعدادات صحيحة لبث الفيديو والاتصال بالإنترنت.
- *  2) جسر VLC/لوحة المفاتيح (WebAppInterface) — تشغيل خارجي بالكامل + بحث يعمل.
+ *  2) جسر VLC/لوحة المفاتيح/تحديث التطبيق (WebAppInterface) — تشغيل خارجي بالكامل،
+ *     بحث يعمل، وتنزيل/تثبيت تحديثات OTA.
  *  3) ربط زر الرجوع الفعلي بمنطق handleBackAction()/isAtRootScreen() بالصفحة.
  *  4) إصلاح فقدان تركيز الريموت بعد العودة من تطبيق خارجي (VLC) — أهم إصلاح هنا.
  */
 public class MainActivity extends Activity {
 
     private WebView webView;
+    private WebAppInterface webAppInterface;
 
     // يُنفَّذ داخل صفحة الويب عند كل ضغطة على زر الرجوع الفعلي بالجهاز/الريموت:
     // - إن كنا بشاشة جذرية (isAtRootScreen) لا معنى للرجوع عنها داخل الصفحة، نُعيد
@@ -85,7 +87,8 @@ public class MainActivity extends Activity {
         });
         webView.setWebChromeClient(new WebChromeClient());
 
-        webView.addJavascriptInterface(new WebAppInterface(this, webView), "AndroidPlayer");
+        webAppInterface = new WebAppInterface(this, webView);
+        webView.addJavascriptInterface(webAppInterface, "AndroidPlayer");
 
         // ضروري حتى تصل ضغطات الريموت (الأسهم/OK) فعلياً لمستمع keydown داخل الصفحة
         webView.setFocusable(true);
@@ -114,14 +117,27 @@ public class MainActivity extends Activity {
     // ريموت بعد الآن (فلا يظهر أي مؤشر تركيز مطلقاً). الإصلاح: نطلب تركيز الـWebView
     // صراحة (على مستوى أندرويد) في كل نقطة استئناف ممكنة، ونطلب من الصفحة نفسها إعادة
     // رسم مؤشر التركيز (tv-focus) صراحة أيضاً كطبقة حماية إضافية.
+    //
+    // طبقة حماية ثانية مهمة (يقابلها الجزء الأكبر بجافاسكريبت — دالة sanitizeDomFocus
+    // بملف tv.html): استدعاء updateFocus() هنا لا يكتفي فقط برسم مؤشر التركيز البصري،
+    // بل يُطهِّر أولاً أي "تركيز حقيقي" (DOM focus) شارد قد يمنحه محرك WebView تلقائياً
+    // لحقل البحث النصي عند استرجاع تركيزه (وهو السبب الفعلي وراء وصول ضغطة OK التالية
+    // لحقل البحث بدل العنصر المعروض بصرياً كمُحدَّد). لأن هذا التطبيق الداخلي لمحرك
+    // WebView قد يحصل بتأخير بسيط عن استدعاء requestFocus نفسه، نُكرر نفس التحقق
+    // مرتين إضافيتين بتأخير قصير كطبقة حماية إضافية — استدعاء updateFocus() في وقت لا
+    // يوجد به أي خلل لا يُغيّر شيئاً ظاهرياً على الإطلاق، فهذا التكرار آمن تماماً.
     private void reclaimWebViewFocus() {
         if (webView == null) return;
-        webView.post(() -> {
-            if (webView == null) return;
-            webView.requestFocus(View.FOCUS_DOWN);
-            webView.evaluateJavascript(
-                    "if (typeof updateFocus === 'function') { updateFocus(); }", null);
-        });
+        webView.post(this::reclaimWebViewFocusOnce);
+        webView.postDelayed(this::reclaimWebViewFocusOnce, 150);
+        webView.postDelayed(this::reclaimWebViewFocusOnce, 500);
+    }
+
+    private void reclaimWebViewFocusOnce() {
+        if (webView == null) return;
+        webView.requestFocus(View.FOCUS_DOWN);
+        webView.evaluateJavascript(
+                "if (typeof updateFocus === 'function') { updateFocus(); }", null);
     }
 
     @Override
@@ -177,6 +193,10 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (webAppInterface != null) {
+            webAppInterface.shutdown();
+            webAppInterface = null;
+        }
         if (webView != null) {
             webView.loadUrl("about:blank");
             webView.stopLoading();
