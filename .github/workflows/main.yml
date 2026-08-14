@@ -49,6 +49,23 @@ jobs:
         working-directory: tv-app
         run: chmod +x ./gradlew
 
+      # يقرأ versionCode/versionName مباشرة من app/build.gradle (المصدر الوحيد لهذه
+      # القيم بالمشروع بأكمله) — يستخدمها كل من نظام نشر OTA بالأسفل وخطوة الملخّص
+      # النهائية. المطوّر لا يُعدِّل أي شيء آخر عند إصدار تحديث سوى هذين الرقمين هنا.
+      - name: Read app version
+        id: app_version
+        working-directory: tv-app
+        run: |
+          VERSION_CODE=$(grep -oP 'versionCode\s+\K[0-9]+' app/build.gradle | head -1)
+          VERSION_NAME=$(grep -oP 'versionName\s+"\K[^"]+' app/build.gradle | head -1)
+          if [ -z "$VERSION_CODE" ] || [ -z "$VERSION_NAME" ]; then
+            echo "::error::تعذّر قراءة versionCode/versionName من app/build.gradle"
+            exit 1
+          fi
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "قراءة إصدار التطبيق: versionCode=$VERSION_CODE versionName=$VERSION_NAME"
+
       # ── APK التصحيح (Debug) — يُبنى دائماً، بلا أي إعداد إضافي مطلوب ──────────────
       # يُوقَّع تلقائياً بمفتاح Android الافتراضي (debug keystore)، فهو صالح للتثبيت
       # المباشر على أي جهاز/صندوق تلفاز فوراً لأغراض الاختبار، دون الحاجة لأي أسرار.
@@ -114,8 +131,118 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          # مهم: لا يجب لهذا الإصدار المُوسَّم (v1.0 مثلاً) أن يصبح "أحدث إصدار" (latest)
+          # إطلاقاً — إصدار "ota-stable" بالأسفل هو من يجب أن يبقى دائماً "الأحدث" لأن
+          # رابط تحديث التطبيق (releases/latest/download/version.json) يعتمد عليه
+          # تحديداً؛ خلاف ذلك يفقد التطبيق القدرة على رؤية آخر تحديث حال دفع وسم جديد.
+          make_latest: false
           files: |
             tv-app/app/build/outputs/apk/debug/*.apk
             tv-app/app/build/outputs/apk/release/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ════════════════════════════════════════════════════════════════════════
+      #  نشر تحديث OTA تلقائياً (يقرأه التطبيق نفسه من داخل الكود عند كل فتح)
+      # ════════════════════════════════════════════════════════════════════════
+      # يعمل عند أي Push فعلي لفرع main/master (وأيضاً عند دفع وسم v* لأن ذلك أيضاً
+      # حدث "push" بمصطلحات GitHub Actions)، وأيضاً عند تشغيل يدوي (workflow_dispatch).
+      # لا يعمل أبداً على Pull Request (حتى لا يُنشَر شيء من فرع غير مُراجَع/مدموج بعد).
+      # كل ما يفعله المطوّر لإصدار تحديث جديد: تغيير versionCode/versionName في
+      # app/build.gradle ثم Push عادي — لا حاجة لأي خطوة يدوية أخرى مطلقاً، ولا لمس
+      # version.json يدوياً على الإطلاق.
+      #
+      # يُنشَر التحديث فقط لو توفّرت أسرار توقيع Release الأربعة (نفس أسرار خطوة
+      # "Build signed release APK" أعلاه) — تحديث تلقائي بملف APK غير موقَّع غير آمن
+      # وقد يفشل تثبيته أصلاً فوق نسخة موقَّعة مثبَّتة حالياً، فنتخطى النشر بأمان بدلاً
+      # من ذلك (يبقى APK الإصدار وAPK التصحيح متاحين كمرفقات تشغيل Workflow كالمعتاد).
+
+      - name: Check currently published OTA version
+        id: ota_check
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.signing_check.outputs.has_signing == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PUBLISHED_CODE=0
+          if gh release view ota-stable --json assets -q '.assets[].name' > /tmp/ota_assets.txt 2>/dev/null; then
+            if grep -qx "version.json" /tmp/ota_assets.txt; then
+              gh release download ota-stable -p version.json -O /tmp/current_version.json --clobber
+              PUBLISHED_CODE=$(jq -r '.versionCode // 0' /tmp/current_version.json 2>/dev/null || echo 0)
+            fi
+          fi
+          case "$PUBLISHED_CODE" in ''|*[!0-9]*) PUBLISHED_CODE=0 ;; esac
+          echo "published_version_code=$PUBLISHED_CODE" >> "$GITHUB_OUTPUT"
+          echo "آخر إصدار OTA منشور فعلياً على GitHub حالياً: versionCode=$PUBLISHED_CODE"
+
+          LOCAL_CODE="${{ steps.app_version.outputs.version_code }}"
+          if [ "$LOCAL_CODE" -gt "$PUBLISHED_CODE" ]; then
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "سيُنشر تحديث OTA جديد: versionCode $PUBLISHED_CODE → $LOCAL_CODE"
+          else
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            echo "لا حاجة لنشر تحديث OTA — versionCode لم يزد ($LOCAL_CODE <= $PUBLISHED_CODE)"
+          fi
+
+      - name: Prepare OTA release files
+        id: ota_prepare
+        if: steps.ota_check.outputs.should_publish == 'true'
+        working-directory: tv-app
+        run: |
+          mkdir -p ota-release
+          RELEASE_APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          if [ -z "$RELEASE_APK" ]; then
+            echo "::error::لم يُعثر على APK إصدار موقَّع بالمسار المتوقَّع"
+            exit 1
+          fi
+          cp "$RELEASE_APK" "ota-release/yallagoal-tv.apk"
+
+          APK_URL="https://github.com/${{ github.repository }}/releases/latest/download/yallagoal-tv.apk"
+          jq -n \
+            --argjson versionCode "${{ steps.app_version.outputs.version_code }}" \
+            --arg versionName "${{ steps.app_version.outputs.version_name }}" \
+            --arg apkUrl "$APK_URL" \
+            --arg notes "تحديث تلقائي إلى الإصدار ${{ steps.app_version.outputs.version_name }}" \
+            '{versionCode: $versionCode, versionName: $versionName, force_update: false, apk_url: $apkUrl, release_notes: $notes}' \
+            > ota-release/version.json
+
+          echo "---- version.json الناتج ----"
+          cat ota-release/version.json
+
+      - name: Publish OTA release (ota-stable)
+        if: steps.ota_check.outputs.should_publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="يلا گول TV — تحديث تلقائي (v${{ steps.app_version.outputs.version_name }})"
+          NOTES="نُشر تلقائياً بواسطة GitHub Actions. versionCode=${{ steps.app_version.outputs.version_code }} versionName=${{ steps.app_version.outputs.version_name }}"
+          if gh release view ota-stable >/dev/null 2>&1; then
+            gh release upload ota-stable \
+              tv-app/ota-release/yallagoal-tv.apk \
+              tv-app/ota-release/version.json \
+              --clobber
+            gh release edit ota-stable --title "$TITLE" --notes "$NOTES" --latest
+          else
+            gh release create ota-stable \
+              tv-app/ota-release/yallagoal-tv.apk \
+              tv-app/ota-release/version.json \
+              --title "$TITLE" --notes "$NOTES" --latest
+          fi
+          echo "✅ نُشر تحديث OTA بنجاح: versionCode=${{ steps.app_version.outputs.version_code }}"
+
+      - name: OTA publish summary
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          {
+            echo "### 🚀 حالة تحديث OTA"
+            if [ "${{ steps.signing_check.outputs.has_signing }}" != "true" ]; then
+              echo "⏭️ تم تخطي فحص/نشر OTA — لا توجد أسرار توقيع Release مُضافة بعد بإعدادات المستودع."
+            elif [ "${{ steps.ota_check.outputs.should_publish }}" == "true" ]; then
+              echo "✅ نُشر تحديث OTA جديد — versionCode: \`${{ steps.app_version.outputs.version_code }}\`، versionName: \`${{ steps.app_version.outputs.version_name }}\`"
+              echo ""
+              echo "سيرى المستخدمون نافذة التحديث عند فتح التطبيق التالي."
+            else
+              echo "ℹ️ لم يُنشَر أي تحديث OTA جديد — versionCode الحالي (\`${{ steps.app_version.outputs.version_code }}\`) لم يزد عن آخر نسخة منشورة (\`${{ steps.ota_check.outputs.published_version_code }}\`)."
+              echo ""
+              echo "لإصدار تحديث جديد: ارفع versionCode وversionName بملف tv-app/app/build.gradle وادفع (Push) عادي."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
