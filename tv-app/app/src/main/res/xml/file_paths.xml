@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    مسارات FileProvider الخاصة بتحديث التطبيق OTA (UpdateManager.java).
+    يجب أن تطابق تماماً المسار الذي يُنزَّل إليه ملف الـAPK فعلياً بكود جافا:
+      - المسار الأساسي: activity.getExternalFilesDir(null)  ← external-files-path
+      - احتياط نادر إن تعذّر التخزين الخارجي: activity.getFilesDir()  ← files-path
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-files-path name="update" path="." />
+    <files-path name="update-internal" path="." />
+</paths>
