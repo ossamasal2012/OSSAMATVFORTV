@@ -6,6 +6,14 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- مطلوبة لنظام تحديث التطبيق OTA: بدونها يرفض أندرويد 8+ (API 26+) فتح مثبّت
+         الحزم لملف الـAPK الذي نزّلناه، حتى لو منح المستخدم صلاحية "تثبيت من مصادر
+         غير معروفة" يدوياً من الإعدادات — هذا التصريح هو ما "يُفعِّل" تلك الصلاحية
+         لتطبيقنا تحديداً أصلاً. لا تخزين خارجي إضافي مطلوب (WRITE_EXTERNAL_STORAGE):
+         نُنزِّل ملف التحديث لمجلد التطبيق الخاص (getExternalFilesDir) وهو دائماً قابل
+         للكتابة لتطبيقنا بلا أي صلاحية إضافية على كل إصدارات أندرويد المدعومة هنا. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- التطبيق يعمل بلا لمس إطلاقاً (تحكم كامل بالريموت/لوحة مفاتيح)، لذا نصرّح أن
          اللمس غير مطلوب — ضروري حتى تعتبر متاجر التطبيقات وأجهزة Android TV هذا
          التطبيق متوافقاً معها (بدون هذا السطر تُستبعد أجهزة التلفاز افتراضياً) -->
@@ -60,6 +68,21 @@
             </intent-filter>
 
         </activity>
+
+        <!-- FileProvider: يمنح مثبّت الحزم (Package Installer) وصولاً آمناً ومؤقتاً
+             لملف الـAPK المُنزَّل عبر رابط content:// بدل file:// مباشر — إلزامي منذ
+             أندرويد 7 (API 24)، إذ يرفض النظام حينها أي مشاركة رابط file:// خام مع
+             تطبيق آخر (FileUriExposedException). android:exported="false" لأن هذا
+             المزوِّد داخلي لتطبيقنا فقط، ولا حاجة لأي تطبيق آخر الوصول إليه مباشرة. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 
