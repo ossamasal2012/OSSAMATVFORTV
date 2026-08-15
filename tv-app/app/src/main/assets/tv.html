@@ -54,6 +54,16 @@
            (القيمة 1 = الحجم "الطبيعي" الافتراضي لعناصر Tailwind قبل أي تصغير) */
         :root {
             --ui-scale: 0.8;
+            /* تعويض ضروري: خاصية zoom لا "تُعيد تعريف" وحدتي vh/vw — تبقيان تُقاسان
+               دائماً من حجم الشاشة الفعلي الحقيقي بغض النظر عن أي zoom على عنصر أب،
+               فأي عنصر ارتفاعه 100vh يُرسَم بحجمه الطبيعي أولاً ثم "يُصغَّر بصرياً" هو
+               نفسه بنسبة zoom فوق ذلك (يترك فراغاً بالأسفل بمقدار نسبة التصغير تماماً
+               — هذا بالضبط سبب "الواجهة مقطوعة من تحت"). الحل: أي عنصر يحتاج فعلياً
+               تغطية كامل الشاشة (100vh/100vw حقيقية) يستخدم هذين المتغيرين بدلاً من
+               100vh/100vw مباشرة — يقسمان على نسبة التصغير مسبقاً، فيُلغي تصغير الـzoom
+               التالي هذا التعويض بالضبط ويعود الناتج المرئي النهائي = كامل الشاشة تماماً. */
+            --full-vh: calc(100vh / var(--ui-scale));
+            --full-vw: calc(100vw / var(--ui-scale));
         }
         html {
             zoom: var(--ui-scale);
@@ -63,7 +73,7 @@
             font-family: 'Tajawal', sans-serif;
             background-color: #020617;
             color: #f1f5f9;
-            height: 100vh;
+            height: var(--full-vh);
             overflow: hidden;
             margin: 0;
             user-select: none;
@@ -142,7 +152,7 @@
         .update-btn-primary.tv-focus { background: #10b981 !important; color: #022c22 !important; border-color: #34d399 !important; transform: scale(1.02); }
 
         #player-container {
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            position: fixed; top: 0; left: 0; width: var(--full-vw); height: var(--full-vh);
             background-color: #000; z-index: 9999; display: none; flex-direction: column;
         }
         #player-container.active { display: flex; }
