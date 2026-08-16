@@ -12,8 +12,9 @@ import android.widget.Toast;
 
 /**
  * جسر جافاسكريبت ↔ أندرويد لهذا التطبيق. مسؤول عن:
- *  1) فتح أي رابط فيديو مباشرة بتطبيق VLC الخارجي (playInVlc) — هو التطبيق الوحيد
- *     المسؤول عن التشغيل الفعلي لكل محتوى الفيديو بهذا التطبيق الآن.
+ *  1) فتح أي رابط فيديو مباشرة بمشغّل خارجي (VLC أو Just Player — يختار المستخدم
+ *     أيهما لكل نوع محتوى من شاشة الإعدادات) — هما التطبيقان الوحيدان المسؤولان
+ *     عن التشغيل الفعلي لكل محتوى الفيديو بهذا التطبيق الآن.
  *  2) إظهار/إخفاء لوحة المفاتيح البرمجية صراحة عند استخدام حقل البحث
  *     (showKeyboard/hideKeyboard)، لأن WebView لا يُظهرها بشكل موثوق دائماً عند
  *     تركيز حقل نصي عبر استدعاء .focus() من جافاسكريبت (بخلاف لمسة مستخدم حقيقية).
@@ -26,6 +27,10 @@ import android.widget.Toast;
 public class WebAppInterface {
 
     private static final String VLC_PACKAGE = "org.videolan.vlc";
+    // Just (Video) Player — moneytoo/Player (com.brouken.player)، مفتوح المصدر، مسجَّل
+    // رسمياً لمعالجة ACTION_VIEW لروابط http/https بنوع video/* (تحقَّقنا من هذا مباشرة
+    // من AndroidManifest.xml الفعلي للمشروع قبل اعتماده، وليس تخميناً).
+    private static final String JUST_PLAYER_PACKAGE = "com.brouken.player";
 
     private final Activity activity;
     private final WebView webView;
@@ -38,48 +43,60 @@ public class WebAppInterface {
     }
 
     /**
-     * يفتح رابط الفيديو مباشرة بتطبيق VLC (نفس تطبيق VLC العادي المتوفر بمتجر Play —
-     * حزمة واحدة موحّدة تعمل بواجهة تتكيّف تلقائياً مع الهاتف/الجهاز اللوحي/التلفاز،
-     * لا يوجد إصدار Android TV منفصل بحزمة مختلفة). لو لم يكن VLC مثبَّتاً، يُفتح
-     * متجر Play مباشرة على صفحته لتثبيته بدل فشل صامت لا يوضّح السبب للمستخدم.
+     * نقطة الدخول الموحَّدة الجديدة: يفتح رابط الفيديو بالمشغّل الخارجي الذي اختاره
+     * المستخدم لنوع هذا المحتوى تحديداً من شاشة الإعدادات (playerId: "vlc" أو
+     * "justplayer" — أي قيمة أخرى/غير معروفة تُعامَل كـVLC افتراضياً للأمان).
+     */
+    @JavascriptInterface
+    public void playInExternalPlayer(final String url, final String title, final String playerId) {
+        final String packageName = "justplayer".equals(playerId) ? JUST_PLAYER_PACKAGE : VLC_PACKAGE;
+        activity.runOnUiThread(() -> launchExternalVideoPlayer(packageName, url, title));
+    }
+
+    /**
+     * يفتح رابط الفيديو مباشرة بتطبيق VLC تحديداً. محفوظة بنفس الاسم والتوقيع الأصليين
+     * للتوافق العكسي (كانت نقطة الدخول الوحيدة سابقاً)؛ تُفوِّض الآن لنفس المنطق
+     * الموحَّد المستخدم مع أي مشغّل خارجي آخر.
      */
     @JavascriptInterface
     public void playInVlc(final String url, final String title) {
-        activity.runOnUiThread(() -> {
-            if (url == null || url.trim().isEmpty()) return;
-
-            if (!isPackageInstalled(VLC_PACKAGE)) {
-                openVlcInStore();
-                return;
-            }
-            try {
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                intent.setPackage(VLC_PACKAGE);
-                intent.setDataAndTypeAndNormalize(Uri.parse(url), "video/*");
-                intent.putExtra("title", title == null ? "" : title);
-                intent.putExtra("android.intent.extra.title", title == null ? "" : title);
-                intent.putExtra("from_start", true);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                activity.startActivity(intent);
-            } catch (Exception e) {
-                Toast.makeText(activity, "تعذر فتح VLC لتشغيل هذا الرابط", Toast.LENGTH_SHORT).show();
-            }
-        });
+        activity.runOnUiThread(() -> launchExternalVideoPlayer(VLC_PACKAGE, url, title));
     }
 
-    private void openVlcInStore() {
+    private void launchExternalVideoPlayer(String packageName, String url, String title) {
+        if (url == null || url.trim().isEmpty()) return;
+
+        if (!isPackageInstalled(packageName)) {
+            openPlayerInStore(packageName);
+            return;
+        }
         try {
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + VLC_PACKAGE));
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setPackage(packageName);
+            intent.setDataAndTypeAndNormalize(Uri.parse(url), "video/*");
+            intent.putExtra("title", title == null ? "" : title);
+            intent.putExtra("android.intent.extra.title", title == null ? "" : title);
+            intent.putExtra("from_start", true);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            activity.startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(activity, "تعذر فتح مشغّل الفيديو لتشغيل هذا الرابط", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void openPlayerInStore(String packageName) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + packageName));
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             activity.startActivity(intent);
         } catch (Exception e) {
             try {
                 Intent intent = new Intent(Intent.ACTION_VIEW,
-                        Uri.parse("https://play.google.com/store/apps/details?id=" + VLC_PACKAGE));
+                        Uri.parse("https://play.google.com/store/apps/details?id=" + packageName));
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 activity.startActivity(intent);
             } catch (Exception ignored) {
-                Toast.makeText(activity, "يرجى تثبيت تطبيق VLC لتشغيل المحتوى", Toast.LENGTH_LONG).show();
+                Toast.makeText(activity, "يرجى تثبيت تطبيق تشغيل فيديو لتشغيل هذا المحتوى", Toast.LENGTH_LONG).show();
             }
         }
     }
