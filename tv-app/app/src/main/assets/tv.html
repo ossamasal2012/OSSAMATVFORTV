@@ -151,6 +151,22 @@
         .update-progress-label { font-size: 0.8rem; color: #94a3b8; display: flex; justify-content: space-between; }
         .update-btn-primary.tv-focus { background: #10b981 !important; color: #022c22 !important; border-color: #34d399 !important; transform: scale(1.02); }
 
+        /* ─── نافذة إعدادات المشغّل الخارجي ────────────────────────────── */
+        #settings-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 9600;
+            display: none; align-items: center; justify-content: center;
+        }
+        #settings-modal.active { display: flex !important; }
+        .settings-row {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #0b1220; border: 2px solid #1e293b; border-radius: 12px;
+            padding: 12px 14px; margin: 8px 0; font-size: 0.85rem; color: #cbd5e1;
+            transition: all 0.15s ease;
+        }
+        .settings-row b { color: #10b981; font-size: 0.9rem; }
+        .settings-row.tv-focus { border-color: #34d399 !important; background: rgba(16,185,129,0.15) !important; transform: scale(1.02); }
+        #settingsBtn.tv-focus { background: #10b981 !important; color: #022c22 !important; border-color: #34d399 !important; transform: scale(1.12); }
+
         #player-container {
             position: fixed; top: 0; left: 0; width: var(--full-vw); height: var(--full-vh);
             background-color: #000; z-index: 9999; display: none; flex-direction: column;
@@ -430,10 +446,35 @@
         </div>
     </div>
 
+    <!-- نافذة إعدادات المشغّل الخارجي -->
+    <div id="settings-modal">
+        <div class="modal-content" style="max-width: 460px;">
+            <h2 class="text-lg font-black text-white mb-2">⚙️ إعدادات المشغّل الخارجي</h2>
+            <p class="text-slate-400 mb-3" style="font-size:0.78rem;">اختر تطبيق التشغيل المستخدم لكل نوع محتوى — اضغط OK لتبديل الاختيار بين VLC وJust Player.</p>
+
+            <div class="settings-row" data-kind="live">
+                <span>📡 البث المباشر (القنوات)</span>
+                <b id="settings-live-value">VLC</b>
+            </div>
+            <div class="settings-row" data-kind="movie">
+                <span>🎬 الأفلام</span>
+                <b id="settings-movie-value">VLC</b>
+            </div>
+            <div class="settings-row" data-kind="series">
+                <span>📺 المسلسلات</span>
+                <b id="settings-series-value">VLC</b>
+            </div>
+
+            <button id="settings-btn-close" class="modal-btn update-btn-primary" style="margin-top:14px;">🔙 رجوع</button>
+        </div>
+    </div>
+
     <!-- الواجهة الرئيسية -->
     <div id="main-app" class="flex flex-col h-full w-full hidden">
         <aside class="w-full h-full flex flex-col bg-slate-950 border-l border-slate-900 z-50">
-            <div class="p-4 border-b border-slate-900 text-center shrink-0">
+            <div class="p-4 border-b border-slate-900 text-center shrink-0 relative">
+                <button id="settingsBtn" tabindex="-1" title="إعدادات المشغّل الخارجي"
+                    class="absolute top-3 left-3 w-9 h-9 rounded-full bg-slate-900 border-2 border-slate-800 flex items-center justify-center text-slate-400 text-base transition-all">⚙️</button>
                 <h1 class="text-2xl font-black text-emerald-500 tracking-tight">يلا گـول-المطور:اسامة</h1>
                 <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">نسخة التلفاز الذكي الشاملة</p>
             </div>
@@ -441,7 +482,7 @@
             <div class="p-4 border-b border-slate-900 shrink-0">
                 <div class="relative">
                     <i class="fa-solid fa-magnifying-glass absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-                    <input type="text" id="searchInput" tabindex="-1" placeholder="ابحث عن قناة (اضغط OK للكتابة)"
+                    <input type="search" id="searchInput" tabindex="-1" enterkeyhint="search" placeholder="ابحث عن قناة (اضغط OK للكتابة)"
                         class="w-full bg-slate-900 border-2 border-slate-800 rounded-xl py-3 px-4 pr-10 text-sm focus:outline-none text-white placeholder:text-slate-500 transition-all">
                 </div>
             </div>
@@ -536,6 +577,30 @@
         let poemsChannels = [];
         let filteredChannels = [];
         let favorites = JSON.parse(localStorage.getItem('yalla_favs')) || [];
+
+        // ─── تفضيل المشغّل الخارجي لكل نوع محتوى (البث المباشر/أفلام/مسلسلات) ─────
+        // يُحفَظ بـlocalStorage فيبقى محفوظاً بين مرات فتح التطبيق. الافتراضي دائماً
+        // "vlc" لكل الأنواع (يطابق تماماً السلوك الحالي قبل إضافة هذه الميزة، فلا يتغيّر
+        // شيء لأي مستخدم لم يفتح شاشة الإعدادات إطلاقاً).
+        const PLAYER_PREF_STORAGE_KEYS = { live: 'yalla_player_live', movie: 'yalla_player_movie', series: 'yalla_player_series' };
+        const PLAYER_PREF_LABELS = { vlc: 'VLC', justplayer: 'Just Player' };
+        const PLAYER_PREF_KINDS = ['live', 'movie', 'series'];
+
+        function getPlayerPreference(kind) {
+            try {
+                const v = localStorage.getItem(PLAYER_PREF_STORAGE_KEYS[kind] || PLAYER_PREF_STORAGE_KEYS.live);
+                return v === 'justplayer' ? 'justplayer' : 'vlc';
+            } catch (e) {
+                return 'vlc';
+            }
+        }
+
+        function setPlayerPreference(kind, value) {
+            try {
+                localStorage.setItem(PLAYER_PREF_STORAGE_KEYS[kind] || PLAYER_PREF_STORAGE_KEYS.live, value);
+            } catch (e) {}
+        }
+
         let hls = null;
         // محركا تشغيل إضافيان لتغطية صيغ لا يدعمها hls.js: mpegts.js (بث MPEG-TS خام/FLV)
         // و dash.js (MPEG-DASH). currentPlayerEngine يتتبع أيهما نشط حالياً ('hls'|'mpegts'|
@@ -585,7 +650,7 @@
 
         const SECRET_CODE = "ossamatt22";
 
-        let focusIndices = { auth: 0, channels: 0, categories: 0, controls: 0, menu: 0, modal: 0, servers: 0, iframeBtns: 0, errorBtns: 0, serverChips: 0, xtream: 0, update: 0 };
+        let focusIndices = { auth: 0, channels: 0, categories: 0, controls: 0, menu: 0, modal: 0, servers: 0, iframeBtns: 0, errorBtns: 0, serverChips: 0, xtream: 0, update: 0, settings: 0 };
 
         // ─── العناصر ──────────────────────────────────────────────────────
         const authScreen      = document.getElementById('auth-screen');
@@ -614,6 +679,8 @@
         const errorText       = document.getElementById('error-text');
         const errorButtons    = document.getElementById('error-buttons');
         const updateModal     = document.getElementById('update-modal');
+        const settingsBtn     = document.getElementById('settingsBtn');
+        const settingsModal   = document.getElementById('settings-modal');
 
         const aspectModes  = ['fit', 'fill', 'zoom'];
         const aspectLabels = ['Fit', 'Fill', 'Zoom'];
@@ -858,6 +925,70 @@
                 }
             }
         }
+
+        // ============================================================
+        //  ⚙️ إعدادات المشغّل الخارجي (البث المباشر/الأفلام/المسلسلات)
+        // ============================================================
+        // زر الإعدادات هو أعلى عنصر بترتيب التنقّل الرأسي بالكامل — يُصل إليه بالضغط
+        // على "أعلى" من حقل البحث (وهو بدوره أعلى عنصر بالقائمة الرئيسية حتى الآن)،
+        // فيكون فعلياً "فوق كل شيء" تماماً كما طُلب. نفس فلسفة تنقّل بقية التطبيق
+        // بالضبط: currentMode + focusIndices + updateFocus، لا شيء مختلف.
+        let modeBeforeSettingsModal = 'SEARCH';
+
+        function handleTopSettingsNav(key) {
+            if (key === 'ArrowDown') { currentMode = 'SEARCH'; updateFocus(); }
+            else if (key === 'Enter' || key === ' ') { openSettingsModal(); }
+        }
+
+        function openSettingsModal() {
+            modeBeforeSettingsModal = 'TOP_SETTINGS';
+            focusIndices.settings = 0;
+            currentMode = 'SETTINGS_MODAL';
+            renderSettingsModal();
+            settingsModal.classList.add('active');
+            updateFocus();
+        }
+
+        // زر "🔙 رجوع" بالنافذة نفسها وزر الرجوع الفعلي بالريموت كلاهما يستدعيان هذه
+        // الدالة بالضبط — يعودان دائماً خطوة واحدة فقط: لواجهة التطبيق الرئيسية (مع
+        // إبقاء مؤشر التركيز على زر الإعدادات نفسه، وهو جزء ظاهر من الواجهة الرئيسية
+        // خلف النافذة، وليس شاشة منفصلة).
+        function closeSettingsModal() {
+            settingsModal.classList.remove('active');
+            currentMode = modeBeforeSettingsModal || 'TOP_SETTINGS';
+            updateFocus();
+        }
+
+        function renderSettingsModal() {
+            document.getElementById('settings-live-value').textContent = PLAYER_PREF_LABELS[getPlayerPreference('live')];
+            document.getElementById('settings-movie-value').textContent = PLAYER_PREF_LABELS[getPlayerPreference('movie')];
+            document.getElementById('settings-series-value').textContent = PLAYER_PREF_LABELS[getPlayerPreference('series')];
+        }
+
+        function togglePlayerPreference(kind) {
+            const current = getPlayerPreference(kind);
+            setPlayerPreference(kind, current === 'vlc' ? 'justplayer' : 'vlc');
+            renderSettingsModal();
+        }
+
+        function handleSettingsModalNav(key) {
+            const CLOSE_BTN_IDX = PLAYER_PREF_KINDS.length; // آخر عنصر = زر الرجوع
+            if (key === 'ArrowDown') focusIndices.settings = Math.min(focusIndices.settings + 1, CLOSE_BTN_IDX);
+            else if (key === 'ArrowUp') focusIndices.settings = Math.max(focusIndices.settings - 1, 0);
+            else if (key === 'Enter' || key === ' ') {
+                if (focusIndices.settings === CLOSE_BTN_IDX) { closeSettingsModal(); return; }
+                togglePlayerPreference(PLAYER_PREF_KINDS[focusIndices.settings]);
+                return;
+            }
+            updateFocus();
+        }
+
+        // دعم الفأرة/اللمس المباشر (بجانب تنقّل الريموت أعلاه) — نفس نمط بقية التطبيق.
+        settingsBtn.onclick = () => { currentMode = 'TOP_SETTINGS'; openSettingsModal(); };
+        document.getElementById('settings-btn-close').onclick = () => closeSettingsModal();
+        document.querySelectorAll('#settings-modal .settings-row').forEach((row, idx) => {
+            row.onclick = () => { focusIndices.settings = idx; togglePlayerPreference(PLAYER_PREF_KINDS[idx]); };
+        });
 
         // ─── تحميل القنوات ──────────────────────────────────────────────
         const MAIN_CHANNELS_URL = "https://raw.githubusercontent.com/ossamasal2012/yalla-data/refs/heads/main/channels.json";
@@ -1433,6 +1564,17 @@
             } else if (currentMode === 'UPDATE_PROGRESS') {
                 const retryBtn = document.getElementById('update-btn-retry-install');
                 if (retryBtn && retryBtn.style.display !== 'none') retryBtn.classList.add('tv-focus');
+
+            } else if (currentMode === 'TOP_SETTINGS') {
+                settingsBtn.classList.add('tv-focus');
+
+            } else if (currentMode === 'SETTINGS_MODAL') {
+                const rows = document.querySelectorAll('#settings-modal .settings-row');
+                if (focusIndices.settings < rows.length) {
+                    rows[focusIndices.settings].classList.add('tv-focus');
+                } else {
+                    document.getElementById('settings-btn-close').classList.add('tv-focus');
+                }
             }
         }
 
@@ -1492,6 +1634,8 @@
             else if (currentMode === 'XTREAM_SERIES')   handleXtreamSeriesNav(key);
             else if (currentMode === 'XTREAM_EPISODES') handleXtreamEpisodesNav(key);
             else if (currentMode === 'UPDATE_PROMPT' || currentMode === 'UPDATE_PROGRESS') handleUpdateNav(key);
+            else if (currentMode === 'TOP_SETTINGS')    handleTopSettingsNav(key);
+            else if (currentMode === 'SETTINGS_MODAL')  handleSettingsModalNav(key);
         });
 
         function handleAuthNav(key) {
@@ -1538,6 +1682,7 @@
 
         function handleSearchNav(key) {
             if      (key === 'ArrowDown') { blurInputIntentionally(searchInput); hideKeyboardNative(); currentMode = 'CATEGORIES'; updateFocus(); }
+            else if (key === 'ArrowUp')   { currentMode = 'TOP_SETTINGS'; updateFocus(); }
             else if (key === 'Enter')     { focusInputIntentionally(searchInput); showKeyboardNative(); }
         }
 
@@ -1638,7 +1783,7 @@
         // لا علاقة لهذه الدالة بمنصات أخرى (Tizen/webOS) قد تُشغّل نفس هذه الصفحة —
         // إضافة اختيارية بحتة لا تُغيّر أي سلوك موجود.
         function isAtRootScreen() {
-            if (currentMode === 'AUTH' || currentMode === 'SEARCH') return true;
+            if (currentMode === 'AUTH' || currentMode === 'SEARCH' || currentMode === 'TOP_SETTINGS') return true;
             if (currentMode === 'CHANNELS' && !isInFolder && currentCat === 'الكل' && xtreamStack.length === 0) return true;
             return false;
         }
@@ -1693,6 +1838,11 @@
                 }
                 // إن اكتمل التحميل فعلاً (زر "فتح المثبت" ظاهر)، الرجوع هنا لا يفعل شيئاً —
                 // التحديث الإجباري تحديداً يبقى مطلوباً حتى يُثبَّت فعلياً عبر ذلك الزر.
+            }
+            else if (currentMode === 'SETTINGS_MODAL') {
+                // زر الرجوع الفعلي بالريموت يعمل هنا تماماً كزر "🔙 رجوع" الظاهر بالنافذة
+                // نفسها — يعود خطوة واحدة فقط لواجهة التطبيق الرئيسية، كما هو مطلوب.
+                closeSettingsModal();
             }
         }
 
@@ -2451,7 +2601,7 @@
             const url = xtreamStreamUrl(server, type, item, userInfo);
             if (!url) return;
             const fakeServer = { name: server.name, url, type: 'v' };
-            const fakeChannel = { name: item.name || server.name, category: XTREAM_TYPE_LABELS[type] || '', servers: [fakeServer] };
+            const fakeChannel = { name: item.name || server.name, category: XTREAM_TYPE_LABELS[type] || '', servers: [fakeServer], contentKind: type };
             clearAutoSwitchTimer();
             playChannel(fakeChannel, 0);
         }
@@ -2575,7 +2725,7 @@
             if (!url) return;
             const label = (item.title && String(item.title).trim()) ? item.title : ('الحلقة ' + item.episode_num);
             const fakeServer = { name: server.name, url, type: 'v' };
-            const fakeChannel = { name: label, category: 'مسلسلات', servers: [fakeServer] };
+            const fakeChannel = { name: label, category: 'مسلسلات', servers: [fakeServer], contentKind: 'series' };
             clearAutoSwitchTimer();
             playChannel(fakeChannel, 0);
         }
@@ -2838,11 +2988,16 @@
             // رابط m3u8 فيديو حقيقي، حتى لو كان النوع المخزّن للقناة "iframe".
             const type = isApiUrl(url) ? 'v' : rawType;
             const name = channel.name;
+            // نوع المحتوى (بث مباشر/فيلم/مسلسل) يُحدَّد صراحة عند إنشاء القناة (راجع
+            // playXtreamItem/playXtreamEpisode) — أي قناة عادية بلا هذا الوسم (كل قنوات
+            // channels.json التقليدية) تُعامَل دائماً كبث مباشر، وهو ما كانت عليه فعلياً
+            // قبل إضافة هذه الميزة، فلا يتغيّر شيء لأي مستخدم لم يفتح شاشة الإعدادات.
+            const contentKind = channel.contentKind || 'live';
 
             if (type === 'i') {
                 // محتوى iframe (صفحة تضمين HTML، وليس رابط فيديو مباشراً) — لا معنى
-                // لفتحه بـVLC (يتعامل مع ملفات/بثوث الوسائط فقط، لا صفحات ويب)، فيستمر
-                // بنفس آلية العرض داخل الصفحة كما كانت العادة دائماً بهذا التطبيق.
+                // لفتحه بمشغّل خارجي (يتعامل مع ملفات/بثوث الوسائط فقط، لا صفحات ويب)،
+                // فيستمر بنفس آلية العرض داخل الصفحة كما كانت العادة دائماً بهذا التطبيق.
                 currentMode = 'PLAYER_LOADING';
                 startPlayer(url, type, name, channel, serverIndex);
                 return;
@@ -2850,10 +3005,10 @@
 
             if (isApiUrl(url)) {
                 // رابط API ديناميكي — نحلّه أولاً للحصول على رابط الفيديو الحقيقي
-                // القابل للتشغيل، ثم نفتحه مباشرة بـVLC كأي رابط آخر تماماً.
+                // القابل للتشغيل، ثم نفتحه مباشرة بالمشغّل الخارجي المناسب كأي رابط آخر.
                 showStatus('⏳ جاري التحضير...');
                 resolveStreamUrl(url).then(resolved => {
-                    launchInVlc(resolved.streamUrl, name);
+                    launchInExternalPlayer(resolved.streamUrl, name, contentKind);
                 }).catch(err => {
                     console.error("فشل جلب رابط API:", err);
                     showErrorModal('تعذر جلب رابط البث من المصدر.', channel, serverIndex);
@@ -2862,26 +3017,39 @@
             }
 
             // كل محتوى فيديو آخر (كل قنوات/أفلام/مسلسلات Xtream، وأي رابط قناة مباشر
-            // عادي) يُفتح الآن حصراً بتطبيق VLC الخارجي — لا تشغيل داخل الصفحة إطلاقاً.
-            launchInVlc(url, name);
+            // عادي) يُفتح الآن حصراً بالمشغّل الخارجي الذي اختاره المستخدم لهذا النوع
+            // تحديداً من شاشة الإعدادات (VLC أو Just Player) — لا تشغيل داخل الصفحة إطلاقاً.
+            launchInExternalPlayer(url, name, contentKind);
         }
 
         // ============================================================
-        //  ▶️ نقطة التشغيل الوحيدة لكل محتوى فيديو بالتطبيق: فتح الرابط مباشرة بتطبيق
-        //  VLC الخارجي (نفس تطبيق VLC العادي المُستخدم بالهواتف والأجهزة اللوحية —
-        //  يعمل بواجهة تتكيّف تلقائياً مع أجهزة التلفاز أيضاً، لا يوجد إصدار Android TV
-        //  منفصل بحزمة مختلفة). لا نُشغّل أي شيء داخل الصفحة نفسها بعد الآن لهذا المسار:
-        //  لا HLS.js ولا mpegts.js ولا dash.js ولا <video> — VLC وحده مسؤول بالكامل عن
-        //  التشغيل الفعلي، بأي صيغة كانت (m3u8/ts/mp4/mkv/كل ما يدعمه VLC نفسه).
+        //  ▶️ نقطة التشغيل الوحيدة لكل محتوى فيديو بالتطبيق: فتح الرابط مباشرة بمشغّل
+        //  خارجي — VLC أو Just Player، بحسب اختيار المستخدم لكل نوع محتوى (بث مباشر/
+        //  أفلام/مسلسلات) من شاشة الإعدادات (⚙️ أعلى الواجهة). كلا التطبيقين يعمل
+        //  بواجهة تتكيّف تلقائياً مع أجهزة التلفاز، لا يوجد إصدار Android TV منفصل
+        //  بحزمة مختلفة لأي منهما. لا نُشغّل أي شيء داخل الصفحة نفسها بعد الآن لهذا
+        //  المسار: لا HLS.js ولا mpegts.js ولا dash.js ولا <video> — المشغّل الخارجي
+        //  وحده مسؤول بالكامل عن التشغيل الفعلي، بأي صيغة كانت.
         //
-        //  عمداً لا نُغيّر currentMode هنا: تطبيق VLC يفتح كنشاط أندرويد منفصل يغطي
-        //  الشاشة بالكامل، وصفحتنا تبقى بخلفية بالضبط بنفس الشاشة/التركيز الذي كانت
-        //  عليه — فعند العودة من VLC (زر الرجوع بالريموت)، نظهر فوراً بنفس المكان
+        //  عمداً لا نُغيّر currentMode هنا: المشغّل الخارجي يفتح كنشاط أندرويد منفصل
+        //  يغطي الشاشة بالكامل، وصفحتنا تبقى بخلفية بالضبط بنفس الشاشة/التركيز الذي
+        //  كانت عليه — فعند العودة منه (زر الرجوع بالريموت)، نظهر فوراً بنفس المكان
         //  تماماً دون أي حاجة لاستعادة حالة، ويبقى تحكم الريموت شغّالاً بلا انقطاع.
         // ============================================================
-        function launchInVlc(url, name) {
+        function launchInExternalPlayer(url, name, contentKind) {
             if (!url) return;
-            if (window.AndroidPlayer && typeof window.AndroidPlayer.playInVlc === 'function') {
+            const playerId = getPlayerPreference(contentKind || 'live');
+            const playerLabel = PLAYER_PREF_LABELS[playerId] || 'VLC';
+            if (window.AndroidPlayer && typeof window.AndroidPlayer.playInExternalPlayer === 'function') {
+                try {
+                    window.AndroidPlayer.playInExternalPlayer(url, name || '', playerId);
+                    showStatus('▶️ جاري فتح ' + playerLabel + '...');
+                } catch (e) {
+                    console.error('تعذر استدعاء المشغّل الخارجي:', e);
+                    showStatus('⚠️ تعذر فتح ' + playerLabel);
+                }
+            } else if (window.AndroidPlayer && typeof window.AndroidPlayer.playInVlc === 'function') {
+                // توافق عكسي مع أي نسخة أقدم من جسر أندرويد لا تعرف سوى VLC تحديداً.
                 try {
                     window.AndroidPlayer.playInVlc(url, name || '');
                     showStatus('▶️ جاري فتح VLC...');
@@ -2892,8 +3060,8 @@
             } else {
                 // بيئة اختبار بمتصفح عادي بلا الجسر الأصلي (لا يوجد AndroidPlayer) —
                 // نُظهر تنبيهاً واضحاً بدل فشل صامت لا يوضّح السبب.
-                console.warn('AndroidPlayer.playInVlc غير متاح بهذه البيئة. الرابط:', url);
-                showStatus('⚠️ التشغيل عبر VLC متاح فقط داخل تطبيق أندرويد');
+                console.warn('AndroidPlayer.playInExternalPlayer غير متاح بهذه البيئة. الرابط:', url);
+                showStatus('⚠️ التشغيل الخارجي متاح فقط داخل تطبيق أندرويد');
             }
         }
 
@@ -3452,9 +3620,63 @@
             }
         });
 
+        // ─── الخروج من وضع الكتابة بالبحث ───────────────────────────────────
+        // العلّة المُبلَّغة: عندما يُغلق المستخدم لوحة المفاتيح البرمجية بطريقة لا تصل
+        // كحدث keydown لصفحتنا إطلاقاً (مثال: زر الرجوع الفعلي بالريموت أثناء ظهور
+        // لوحة المفاتيح — أندرويد "يبتلع" هذه الضغطة بالكامل لإغلاق اللوحة فقط ولا
+        // يُمرّرها لتطبيقنا أبداً)، يبقى currentMode عالقاً على 'SEARCH' رغم أن
+        // المستخدم يظن أنه عاد للتصفّح — فتصل ضغطة OK التالية لحقل البحث بدل العنصر
+        // الذي يتنقّل إليه فعلياً (وهذا بالضبط "المؤشر الثاني الوهمي" المذكور).
+        //
+        // الحل بطبقتين:
+        // 1) نجعل حقل البحث type="search" مع enterkeyhint="search" كي تُظهر لوحة
+        //    المفاتيح زر "بحث/تم" صريحاً، ونتعامل معه هنا بنفس معاملة زر الرجوع
+        //    (Escape) تماماً — طريقة "إنهاء" مضمونة الوصول لصفحتنا كحدث حقيقي.
+        // 2) مراقب visualViewport أدناه: يلتقط أي إغلاق للوحة المفاتيح مهما كانت
+        //    الطريقة (حتى تلك التي لا تصل كحدث keydown إطلاقاً) بالاعتماد على تغيّر
+        //    حجم الشاشة المرئي فعلياً بدل انتظار حدث معيّن قد لا يصل أبداً.
         searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') { blurInputIntentionally(searchInput); hideKeyboardNative(); currentMode = 'CATEGORIES'; updateFocus(); }
+            if (e.key === 'Escape' || e.key === 'Enter') {
+                // نمنع وصول نفس الضغطة لمستمع keydown الرئيسي بـdocument: بدونها،
+                // "Escape" تحديداً كان يُعامَل هناك أيضاً كزر رجوع عام (isBack)، فيُعيد
+                // currentMode فوراً لـ'SEARCH' مجدداً — إلغاءً لِما فعلناه للتو بنفس الضغطة.
+                e.stopPropagation();
+                blurInputIntentionally(searchInput);
+                hideKeyboardNative();
+                currentMode = 'CATEGORIES';
+                updateFocus();
+            }
         });
+
+        // بعض تطبيقات لوحة المفاتيح تُطلِق حدث "search" المخصّص لحقول type="search"
+        // بدل/بجانب keydown عادي عند الضغط على زر البحث — طبقة حماية إضافية.
+        searchInput.addEventListener('search', () => {
+            if (currentMode === 'SEARCH') {
+                blurInputIntentionally(searchInput);
+                hideKeyboardNative();
+                currentMode = 'CATEGORIES';
+                updateFocus();
+            }
+        });
+
+        // الطبقة الحاسمة: مراقبة الحجم الفعلي المرئي للصفحة. تكبر هذه المساحة تلقائياً
+        // عندما تختفي لوحة المفاتيح البرمجية أياً كانت طريقة إغلاقها — حتى تلك التي لا
+        // تُطلِق أي حدث keydown/search نلتقطه أعلاه إطلاقاً. إن اختفت اللوحة بينما ظننّا
+        // أننا ما زلنا بوضع كتابة بحث نشط، نُصحِّح الحالة فوراً هنا كملاذ أخير مضمون.
+        if (window.visualViewport) {
+            let lastVisualViewportHeight = window.visualViewport.height;
+            window.visualViewport.addEventListener('resize', () => {
+                const newHeight = window.visualViewport.height;
+                const grewBack = newHeight > lastVisualViewportHeight + 40;
+                lastVisualViewportHeight = newHeight;
+                if (grewBack && currentMode === 'SEARCH') {
+                    blurInputIntentionally(searchInput);
+                    hideKeyboardNative();
+                    currentMode = 'CATEGORIES';
+                    updateFocus();
+                }
+            });
+        }
 
         // ─── تشغيل ────────────────────────────────────────────────────────
         // ─── إصلاح إضافي (شبكة أمان جافاسكريبت) لمشكلة اختفاء مؤشر تركيز الريموت ───
