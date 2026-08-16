@@ -98,7 +98,15 @@ public class UpdateManager {
                 long localVersionCode = getLongVersionCode(pi);
                 String localVersionName = pi.versionName != null ? pi.versionName : String.valueOf(localVersionCode);
 
-                if (remoteVersionCode <= localVersionCode) return; // النسخة الحالية محدَّثة بالفعل
+                if (remoteVersionCode <= localVersionCode) {
+                    // النسخة الحالية محدَّثة بالفعل — إن تبقّى ملف تحديث قديم من دورة
+                    // تحديث سابقة (نادراً: مثلاً تم تنزيله لكن لم يُثبَّت فوراً)، لم يعد
+                    // له أي داعٍ الآن؛ نحذفه هنا تحديداً كي لا يتراكم بمساحة التخزين
+                    // عبر إصدارات متعددة بلا داعٍ، ولضمان عدم وجود أي أثر لملفات تحديث
+                    // قديمة بعد اكتمال كل عملية تحديث فعلياً.
+                    cleanupStaleUpdateFile();
+                    return;
+                }
 
                 JSONObject payload = new JSONObject();
                 payload.put("versionCode", remoteVersionCode);
@@ -290,6 +298,23 @@ public class UpdateManager {
             return conn.getContentLengthLong();
         }
         return conn.getContentLength();
+    }
+
+    /** يحذف أي ملف تحديث APK متبقٍّ بمجلدي التخزين المحتمَلين (خارجي ثم داخلي احتياطياً) إن وُجد. آمن تماماً حتى لو لم يوجد أي ملف أصلاً. */
+    private void cleanupStaleUpdateFile() {
+        try {
+            File extDir = activity.getExternalFilesDir(null);
+            if (extDir != null) {
+                File f = new File(extDir, APK_FILE_NAME);
+                if (f.exists()) //noinspection ResultOfMethodCallIgnored
+                    f.delete();
+            }
+            File intFile = new File(activity.getFilesDir(), APK_FILE_NAME);
+            if (intFile.exists()) //noinspection ResultOfMethodCallIgnored
+                intFile.delete();
+        } catch (Exception ignored) {
+            // تنظيف اختياري بحت — أي فشل هنا لا يجب أن يؤثر على أي شيء آخر بالتطبيق.
+        }
     }
 
     private void callJs(final String jsExpression) {
