@@ -67,6 +67,7 @@
         }
         html {
             zoom: var(--ui-scale);
+            overflow: hidden;
         }
 
         body {
@@ -610,6 +611,17 @@
         let currentPlayerEngine = null;
         let currentCat = "الكل";
         let searchQuery = "";
+        // ─── حالتا البحث الصريحتان (Search Navigation Mode مقابل Search Editing Mode) ───
+        // isSearchOpen: المستخدم بمنطقة البحث حالياً (سواء كان مؤشرها البصري مُبرَزاً فقط
+        //   أو يكتب فعلاً بداخلها) — تُقرَأ مباشرة من currentMode === 'SEARCH'، بلا تكرار حالة.
+        // isSearchEditing: المستخدم يكتب فعلياً الآن (تركيز حقيقي على الحقل ولوحة المفاتيح
+        //   ظاهرة). هذا هو الفارق الحاسم: بينما هي true، مستمع لوحة المفاتيح الرئيسي
+        //   بالتطبيق (أسفل) يُسلِّم كل المفاتيح للحقل مباشرة بلا أي تدخل من نظام تنقّل
+        //   الريموت العام إطلاقاً — لا "تنقّل فوق input" كما طُلب صراحة.
+        function isSearchOpen() { return currentMode === 'SEARCH'; }
+        let isSearchEditing = false;
+        let searchDebounceTimer = null;
+        const SEARCH_DEBOUNCE_MS = 300; // فترة قصيرة غير محسوسة، لكنها كافية لمنع إعادة رسم القائمة كاملة مع كل حرف أثناء الكتابة السريعة
         let currentMode = 'AUTH';
         let selectedChannel = null;
         let currentServerIndex = 0;
@@ -747,6 +759,21 @@
                 setTimeout(() => authError.classList.add('hidden'), 3000);
             }
         }
+
+        // بنفس مبدأ حقل البحث تماماً: الآن وأن وضع التحرير النصي (انظر مستمع keydown
+        // الرئيسي بـdocument) يُسلِّم كل مفاتيح الكتابة لحقل كلمة السر مباشرة دون أي
+        // تدخل من نظام تنقّل الريموت، يحتاج الحقل مستمعاً خاصاً به يتعامل مع Enter/Done
+        // تحديداً — يطابق هذا أيضاً سلوك نماذج تسجيل الدخول القياسية (اكتب ثم Enter
+        // يُرسِل مباشرة)، بدل الاعتماد على تتابع الأسهم+OK الذي لم يعد يعمل أثناء
+        // الكتابة الفعلية أصلاً (لوحة المفاتيح البرمجية نفسها تستهلك ضغطات الأسهم
+        // لتنقّلها الداخلي بينما تكون هي الوسيلة النشطة، لا صفحتنا).
+        authInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.stopPropagation();
+                blurInputIntentionally(authInput);
+                handleAuth();
+            }
+        });
 
         function proceedToApp() {
             authScreen.style.display = 'none';
@@ -1434,6 +1461,26 @@
             el.setAttribute('tabindex', '-1');
         }
 
+        // ─── نقطتا الدخول/الخروج الوحيدتان لوضع "تحرير نص البحث" ────────────────
+        // كل مكان بالتطبيق يريد بدء/إنهاء الكتابة الفعلية بحقل البحث يستدعي هاتين
+        // الدالتين تحديداً (بدل التعامل المباشر مع focusInputIntentionally/
+        // blurInputIntentionally) — يضمن هذا استحالة تعارض isSearchEditing مع الواقع
+        // الفعلي لحالة التركيز، مهما كثرت نقاط الاستدعاء عبر الكود.
+        function enterSearchEditingMode() {
+            isSearchEditing = true;
+            focusInputIntentionally(searchInput);
+            showKeyboardNative();
+        }
+
+        function exitSearchEditingMode() {
+            isSearchEditing = false;
+            clearTimeout(searchDebounceTimer);
+            blurInputIntentionally(searchInput);
+            hideKeyboardNative();
+            currentMode = 'CATEGORIES';
+            updateFocus();
+        }
+
         function sanitizeDomFocus() {
             const active = document.activeElement;
             if (!active || active === document.body) return;
@@ -1581,10 +1628,26 @@
         // ─── التنقل بلوحة المفاتيح ────────────────────────────────────────
         document.addEventListener('keydown', (e) => {
             const key = e.key;
+
+            // ═══ وضع التحرير النصي (Editing Mode) — يُفصَل صراحةً هنا عن وضع التنقّل ═══
+            // بينما حقل البحث أو حقل كلمة السر يملك تركيزاً حقيقياً فعلياً (المستخدم
+            // يكتب الآن)، نُسلِّم كل مفتاح لسلوكه الافتراضي الطبيعي الكامل بالحقل نفسه
+            // فوراً هنا، دون أي تدخل من نظام تنقّل الريموت العام أدناه إطلاقاً — لا
+            // preventDefault لأي مفتاح، ولا استدعاء لأي دالة handleXxxNav. الحقلان لهما
+            // مستمعا keydown خاصان بهما فقط (Escape/Enter تحديداً لإنهاء التحرير)
+            // يسبقان هذا المستمع بمرحلة الاستهداف (Target Phase) قبل الفقاعة (Bubble)،
+            // وهما من يقرران الخروج من وضع التحرير عند الحاجة عبر exitSearchEditingMode
+            // — وليس هنا. بهذا: حروف/أرقام/مسافة تُكتَب بشكل طبيعي 100%، وBackspace
+            // يحذف حرفاً بشكل طبيعي 100%، والأسهم يسار/يمين تُحرِّك مؤشر الكتابة داخل
+            // النص بشكل طبيعي 100% — لا شيء منها "يتسرّب" لنظام تنقّل التطبيق إطلاقاً.
+            if (document.activeElement === searchInput || document.activeElement === authInput) {
+                return;
+            }
+
             const isBack = key === 'Escape' || key === 'Backspace' || e.keyCode === 461 || e.keyCode === 10009;
 
             if (isBack) {
-                if (document.activeElement !== searchInput && document.activeElement !== authInput) e.preventDefault();
+                e.preventDefault();
                 handleBackAction();
                 return;
             }
@@ -1601,7 +1664,7 @@
             }
 
             if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(key)) e.preventDefault();
-            if (key === ' ' && document.activeElement !== searchInput) e.preventDefault();
+            if (key === ' ') e.preventDefault();
 
             if      (currentMode === 'AUTH')           handleAuthNav(key);
             else if (currentMode === 'MODAL')          handleModalNav(key);
@@ -1681,9 +1744,9 @@
         }
 
         function handleSearchNav(key) {
-            if      (key === 'ArrowDown') { blurInputIntentionally(searchInput); hideKeyboardNative(); currentMode = 'CATEGORIES'; updateFocus(); }
+            if      (key === 'ArrowDown') { exitSearchEditingMode(); }
             else if (key === 'ArrowUp')   { currentMode = 'TOP_SETTINGS'; updateFocus(); }
-            else if (key === 'Enter')     { focusInputIntentionally(searchInput); showKeyboardNative(); }
+            else if (key === 'Enter')     { enterSearchEditingMode(); }
         }
 
         // WebView لا يُظهر لوحة المفاتيح البرمجية بشكل موثوق دائماً عند تركيز حقل نصي
@@ -3609,15 +3672,24 @@
         }
 
         // ─── البحث ────────────────────────────────────────────────────────
+        // إعادة الرسم الكاملة للقائمة (قد تصل لمئات العناصر) عملية غير رخيصة — تنفيذها
+        // بلا أي تأخير مع كل ضغطة حرف أثناء الكتابة السريعة هو ما كان يُثقل خيط الواجهة
+        // الرئيسي بعشرات إعادات الرسم المتلاحقة، لدرجة قد تُربك اتصال لوحة المفاتيح
+        // البرمجية بالحقل نفسه على بعض الأجهزة (وهو ما كان يبدو وكأن الكتابة "تتوقف" أو
+        // "تُنفِّذ البحث بعد أول حرف فقط"). الحل: تأخير حقيقي (debounce) — لا تُنفَّذ إعادة
+        // الرسم إلا بعد توقّف المستخدم عن الكتابة لفترة قصيرة فعلاً، تماماً كما طُلب.
         searchInput.addEventListener('input', (e) => {
             searchQuery = e.target.value;
-            focusIndices.channels = 0;
-            focusIndices.xtream = 0;
-            if (xtreamStack.length > 0) {
-                xtreamRepaintCurrent();
-            } else {
-                filterChannels();
-            }
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => {
+                focusIndices.channels = 0;
+                focusIndices.xtream = 0;
+                if (xtreamStack.length > 0) {
+                    xtreamRepaintCurrent();
+                } else {
+                    filterChannels();
+                }
+            }, SEARCH_DEBOUNCE_MS);
         });
 
         // ─── الخروج من وضع الكتابة بالبحث ───────────────────────────────────
@@ -3628,53 +3700,35 @@
         // المستخدم يظن أنه عاد للتصفّح — فتصل ضغطة OK التالية لحقل البحث بدل العنصر
         // الذي يتنقّل إليه فعلياً (وهذا بالضبط "المؤشر الثاني الوهمي" المذكور).
         //
-        // الحل بطبقتين:
+        // الحل بثلاث طبقات، كلها تصبّ الآن بنقطة خروج واحدة موحّدة (exitSearchEditingMode):
         // 1) نجعل حقل البحث type="search" مع enterkeyhint="search" كي تُظهر لوحة
         //    المفاتيح زر "بحث/تم" صريحاً، ونتعامل معه هنا بنفس معاملة زر الرجوع
         //    (Escape) تماماً — طريقة "إنهاء" مضمونة الوصول لصفحتنا كحدث حقيقي.
-        // 2) مراقب visualViewport أدناه: يلتقط أي إغلاق للوحة المفاتيح مهما كانت
-        //    الطريقة (حتى تلك التي لا تصل كحدث keydown إطلاقاً) بالاعتماد على تغيّر
-        //    حجم الشاشة المرئي فعلياً بدل انتظار حدث معيّن قد لا يصل أبداً.
+        // 2) حدث "search" المخصّص لحقول type="search" ببعض تطبيقات لوحة المفاتيح.
+        // 3) مراقب visualViewport أدناه: يلتقط أي إغلاق للوحة المفاتيح مهما كانت
+        //    الطريقة (حتى تلك التي لا تصل كحدث keydown/search إطلاقاً) بالاعتماد على
+        //    تغيّر حجم الشاشة المرئي فعلياً بدل انتظار حدث معيّن قد لا يصل أبداً.
         searchInput.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' || e.key === 'Enter') {
                 // نمنع وصول نفس الضغطة لمستمع keydown الرئيسي بـdocument: بدونها،
                 // "Escape" تحديداً كان يُعامَل هناك أيضاً كزر رجوع عام (isBack)، فيُعيد
                 // currentMode فوراً لـ'SEARCH' مجدداً — إلغاءً لِما فعلناه للتو بنفس الضغطة.
                 e.stopPropagation();
-                blurInputIntentionally(searchInput);
-                hideKeyboardNative();
-                currentMode = 'CATEGORIES';
-                updateFocus();
+                exitSearchEditingMode();
             }
         });
 
-        // بعض تطبيقات لوحة المفاتيح تُطلِق حدث "search" المخصّص لحقول type="search"
-        // بدل/بجانب keydown عادي عند الضغط على زر البحث — طبقة حماية إضافية.
         searchInput.addEventListener('search', () => {
-            if (currentMode === 'SEARCH') {
-                blurInputIntentionally(searchInput);
-                hideKeyboardNative();
-                currentMode = 'CATEGORIES';
-                updateFocus();
-            }
+            if (isSearchEditing) exitSearchEditingMode();
         });
 
-        // الطبقة الحاسمة: مراقبة الحجم الفعلي المرئي للصفحة. تكبر هذه المساحة تلقائياً
-        // عندما تختفي لوحة المفاتيح البرمجية أياً كانت طريقة إغلاقها — حتى تلك التي لا
-        // تُطلِق أي حدث keydown/search نلتقطه أعلاه إطلاقاً. إن اختفت اللوحة بينما ظننّا
-        // أننا ما زلنا بوضع كتابة بحث نشط، نُصحِّح الحالة فوراً هنا كملاذ أخير مضمون.
         if (window.visualViewport) {
             let lastVisualViewportHeight = window.visualViewport.height;
             window.visualViewport.addEventListener('resize', () => {
                 const newHeight = window.visualViewport.height;
                 const grewBack = newHeight > lastVisualViewportHeight + 40;
                 lastVisualViewportHeight = newHeight;
-                if (grewBack && currentMode === 'SEARCH') {
-                    blurInputIntentionally(searchInput);
-                    hideKeyboardNative();
-                    currentMode = 'CATEGORIES';
-                    updateFocus();
-                }
+                if (grewBack && isSearchEditing) exitSearchEditingMode();
             });
         }
 
