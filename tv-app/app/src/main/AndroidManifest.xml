@@ -46,13 +46,19 @@
         android:usesCleartextTraffic="true"
         android:theme="@style/AppTheme">
 
+        <!-- adjustNothing (وليس adjustResize): واجهة هذا التطبيق ثابتة الحجم بالكامل
+             (لا نموذج تمرير عادي)، وحقل البحث بأعلى الشاشة بعيداً عن منطقة تغطية لوحة
+             المفاتيح أصلاً — فلا داعي لأي تغيير بحجم نافذة النشاط عند ظهورها. adjustResize
+             كان يُجبر أندرويد فعلياً على تصغير نافذة التطبيق بالكامل (وبالتالي كل تخطيط
+             WebView المبني على 100vh) في كل مرة تظهر لوحة المفاتيح، وهذا بالضبط ما كان
+             يُحدِث القفزة/الانتقال المرئي المزعج للواجهة عند فتح البحث. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|uiMode"
             android:launchMode="singleTask"
-            android:windowSoftInputMode="adjustResize"
+            android:windowSoftInputMode="adjustNothing"
             android:theme="@style/AppTheme">
 
             <!-- منفذ الإطلاق العادي (هواتف/أجهزة لوحية) -->
