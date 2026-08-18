@@ -168,6 +168,80 @@
         .settings-row.tv-focus { border-color: #34d399 !important; background: rgba(16,185,129,0.15) !important; transform: scale(1.02); }
         #settingsBtn.tv-focus { background: #10b981 !important; color: #022c22 !important; border-color: #34d399 !important; transform: scale(1.12); }
 
+        /* ─── ظهور تدريجي وسلس لكل قوائم المحتوى ──────────────────────────
+           كل قائمة بالتطبيق (القنوات، مجلدات القرآن/القصائد، وكل شاشات Xtream:
+           السيرفرات/التصنيفات/البث المباشر/الأفلام/المسلسلات/المواسم/الحلقات) تُرسَم
+           داخل نفس الحاوية #channelsBox بالضبط — قاعدة CSS واحدة هنا تكفي لتطبيق
+           التأثير على كل شيء دفعة واحدة، دون لمس أي دالة رسم على حدة. كل عنصر
+           مباشر بداخلها يظهر بتلاشٍ تصاعدي خفيف (Fade + Slide) بترتيب ظهوره على
+           الشاشة، بتأخير 14ms فقط بين كل عنصر والذي يليه — سريع جداً وسلس، لا يبطئ
+           شيئاً (أول 30 عنصراً فقط تتدرّج بفارق زمني ملحوظ؛ أي عنصر بعدها يظهر فوراً
+           بلا تأخير إضافي، لأنه غالباً خارج الشاشة المرئية أصلاً قبل التمرير إليه). */
+        @keyframes staggerFadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        #channelsBox > * { animation: staggerFadeIn 0.22s ease-out both; }
+        #channelsBox > *:nth-child(1) { animation-delay: 0ms; }
+        #channelsBox > *:nth-child(2) { animation-delay: 14ms; }
+        #channelsBox > *:nth-child(3) { animation-delay: 28ms; }
+        #channelsBox > *:nth-child(4) { animation-delay: 42ms; }
+        #channelsBox > *:nth-child(5) { animation-delay: 56ms; }
+        #channelsBox > *:nth-child(6) { animation-delay: 70ms; }
+        #channelsBox > *:nth-child(7) { animation-delay: 84ms; }
+        #channelsBox > *:nth-child(8) { animation-delay: 98ms; }
+        #channelsBox > *:nth-child(9) { animation-delay: 112ms; }
+        #channelsBox > *:nth-child(10) { animation-delay: 126ms; }
+        #channelsBox > *:nth-child(11) { animation-delay: 140ms; }
+        #channelsBox > *:nth-child(12) { animation-delay: 154ms; }
+        #channelsBox > *:nth-child(13) { animation-delay: 168ms; }
+        #channelsBox > *:nth-child(14) { animation-delay: 182ms; }
+        #channelsBox > *:nth-child(15) { animation-delay: 196ms; }
+        #channelsBox > *:nth-child(16) { animation-delay: 210ms; }
+        #channelsBox > *:nth-child(17) { animation-delay: 224ms; }
+        #channelsBox > *:nth-child(18) { animation-delay: 238ms; }
+        #channelsBox > *:nth-child(19) { animation-delay: 252ms; }
+        #channelsBox > *:nth-child(20) { animation-delay: 266ms; }
+        #channelsBox > *:nth-child(21) { animation-delay: 280ms; }
+        #channelsBox > *:nth-child(22) { animation-delay: 294ms; }
+        #channelsBox > *:nth-child(23) { animation-delay: 308ms; }
+        #channelsBox > *:nth-child(24) { animation-delay: 322ms; }
+        #channelsBox > *:nth-child(25) { animation-delay: 336ms; }
+        #channelsBox > *:nth-child(26) { animation-delay: 350ms; }
+        #channelsBox > *:nth-child(27) { animation-delay: 364ms; }
+        #channelsBox > *:nth-child(28) { animation-delay: 378ms; }
+        #channelsBox > *:nth-child(29) { animation-delay: 392ms; }
+        #channelsBox > *:nth-child(30) { animation-delay: 406ms; }
+
+        /* ─── لوحة المفاتيح الافتراضية داخل التطبيق ─────────────────────── */
+        #keyboard-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 9700;
+            display: none; align-items: center; justify-content: center;
+        }
+        #keyboard-modal.active { display: flex !important; }
+        .keyboard-content {
+            background: #0f172a; border: 2px solid #1e293b; border-radius: 20px;
+            padding: 22px; max-width: 760px; width: 92%;
+        }
+        .keyboard-display-row {
+            background: #020617; border: 2px solid #1e293b; border-radius: 12px;
+            padding: 14px 18px; margin-bottom: 16px; min-height: 24px;
+            font-size: 1.15rem; color: #f1f5f9; text-align: right; direction: rtl;
+            white-space: nowrap; overflow: hidden;
+        }
+        .keyboard-cursor { color: #10b981; font-weight: bold; animation: kbdBlink 1s step-end infinite; }
+        @keyframes kbdBlink { 50% { opacity: 0; } }
+        .keyboard-row { display: flex; gap: 6px; margin-bottom: 6px; }
+        .keyboard-row:last-child { margin-bottom: 0; }
+        .kbd-key {
+            flex: 1; min-width: 0; background: #1e293b; border: 2px solid #334155;
+            border-radius: 8px; padding: 12px 4px; text-align: center; color: #e2e8f0;
+            font-size: 1rem; font-weight: 800; cursor: pointer; transition: all 0.1s ease;
+        }
+        .kbd-key.kbd-wide { flex: 3; }
+        .kbd-key.kbd-action { background: #1e2f4a; color: #93c5fd; font-size: 0.85rem; }
+        .kbd-key.tv-focus { background: #10b981 !important; color: #022c22 !important; border-color: #34d399 !important; transform: scale(1.1); }
+
         #player-container {
             position: fixed; top: 0; left: 0; width: var(--full-vw); height: var(--full-vh);
             background-color: #000; z-index: 9999; display: none; flex-direction: column;
@@ -470,6 +544,17 @@
         </div>
     </div>
 
+    <!-- لوحة مفاتيح افتراضية داخل التطبيق لحقل البحث (بديل كامل عن لوحة مفاتيح
+         أندرويد النظامية) — تدعم العربية/الإنجليزية/الأرقام وتنقّل الريموت الكامل -->
+    <div id="keyboard-modal">
+        <div class="keyboard-content">
+            <div class="keyboard-display-row">
+                <span id="keyboard-text-display"></span><span class="keyboard-cursor">|</span>
+            </div>
+            <div id="keyboard-grid"></div>
+        </div>
+    </div>
+
     <!-- الواجهة الرئيسية -->
     <div id="main-app" class="flex flex-col h-full w-full hidden">
         <aside class="w-full h-full flex flex-col bg-slate-950 border-l border-slate-900 z-50">
@@ -483,7 +568,10 @@
             <div class="p-4 border-b border-slate-900 shrink-0">
                 <div class="relative">
                     <i class="fa-solid fa-magnifying-glass absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-                    <input type="search" id="searchInput" tabindex="-1" enterkeyhint="search" placeholder="ابحث عن قناة (اضغط OK للكتابة)"
+                    <!-- عنصر عرض فقط الآن: لوحة المفاتيح الافتراضية داخل التطبيق (لاحقاً بالكود)
+                         هي من تكتب فعلياً بـsearchQuery وتُحدِّث .value هنا؛ readonly + tabindex="-1"
+                         دائمين يمنعان أي تركيز حقيقي أو تفاعل مع لوحة مفاتيح أندرويد النظامية هنا نهائياً. -->
+                    <input type="text" id="searchInput" tabindex="-1" readonly placeholder="ابحث عن قناة (اضغط OK للكتابة)"
                         class="w-full bg-slate-900 border-2 border-slate-800 rounded-xl py-3 px-4 pr-10 text-sm focus:outline-none text-white placeholder:text-slate-500 transition-all">
                 </div>
             </div>
@@ -611,17 +699,14 @@
         let currentPlayerEngine = null;
         let currentCat = "الكل";
         let searchQuery = "";
-        // ─── حالتا البحث الصريحتان (Search Navigation Mode مقابل Search Editing Mode) ───
-        // isSearchOpen: المستخدم بمنطقة البحث حالياً (سواء كان مؤشرها البصري مُبرَزاً فقط
-        //   أو يكتب فعلاً بداخلها) — تُقرَأ مباشرة من currentMode === 'SEARCH'، بلا تكرار حالة.
-        // isSearchEditing: المستخدم يكتب فعلياً الآن (تركيز حقيقي على الحقل ولوحة المفاتيح
-        //   ظاهرة). هذا هو الفارق الحاسم: بينما هي true، مستمع لوحة المفاتيح الرئيسي
-        //   بالتطبيق (أسفل) يُسلِّم كل المفاتيح للحقل مباشرة بلا أي تدخل من نظام تنقّل
-        //   الريموت العام إطلاقاً — لا "تنقّل فوق input" كما طُلب صراحة.
-        function isSearchOpen() { return currentMode === 'SEARCH'; }
-        let isSearchEditing = false;
+        // isSearchOpen: المستخدم بمنطقة البحث حالياً (مؤشرها البصري مُبرَزاً، سواء قبل أو
+        // بعد فتح لوحة المفاتيح الافتراضية) — تُقرَأ مباشرة من currentMode، بلا تكرار حالة.
+        // الكتابة الفعلية نفسها أصبحت currentMode === 'KEYBOARD' (لوحة المفاتيح الافتراضية
+        // داخل التطبيق، راجع القسم المخصَّص لها لاحقاً) — جزء طبيعي من نظام الأوضاع
+        // الموحَّد بالتطبيق كباقي الشاشات تماماً، لا حالة تركيز DOM حقيقية متورطة إطلاقاً.
+        function isSearchOpen() { return currentMode === 'SEARCH' || currentMode === 'KEYBOARD'; }
         let searchDebounceTimer = null;
-        const SEARCH_DEBOUNCE_MS = 300; // فترة قصيرة غير محسوسة، لكنها كافية لمنع إعادة رسم القائمة كاملة مع كل حرف أثناء الكتابة السريعة
+        const SEARCH_DEBOUNCE_MS = 300; // فترة قصيرة غير محسوسة، لكنها كافية لمنع إعادة رسم القائمة كاملة مع كل حرف أثناء الاختيار السريع
         let currentMode = 'AUTH';
         let selectedChannel = null;
         let currentServerIndex = 0;
@@ -693,6 +778,9 @@
         const updateModal     = document.getElementById('update-modal');
         const settingsBtn     = document.getElementById('settingsBtn');
         const settingsModal   = document.getElementById('settings-modal');
+        const keyboardModal   = document.getElementById('keyboard-modal');
+        const keyboardGrid    = document.getElementById('keyboard-grid');
+        const keyboardTextDisplay = document.getElementById('keyboard-text-display');
 
         const aspectModes  = ['fit', 'fill', 'zoom'];
         const aspectLabels = ['Fit', 'Fill', 'Zoom'];
@@ -1017,6 +1105,158 @@
             row.onclick = () => { focusIndices.settings = idx; togglePlayerPreference(PLAYER_PREF_KINDS[idx]); };
         });
 
+        // ============================================================
+        //  ⌨️ لوحة مفاتيح افتراضية داخل التطبيق — بديل كامل عن لوحة مفاتيح أندرويد
+        //  النظامية لحقل البحث تحديداً. مصمَّمة بالكامل هنا بجافاسكريبت/HTML/CSS،
+        //  تدعم تنقّل الريموت الكامل (شبكة ثنائية الأبعاد)، والعربية والإنجليزية
+        //  والأرقام (زر تبديل اللغة)، وزر بحث صريح. الأهم: لا تحتاج أي تركيز حقيقي
+        //  (DOM Focus) على أي حقل نصي إطلاقاً — كل ضغطة زر تُعالَج كحدث D-pad عادي
+        //  بنفس فلسفة تنقّل التطبيق بأكمله، فتتجنّب من جذورها كل فئة مشاكل تركيز/
+        //  تمرير الشاشة/توقيت لوحة المفاتيح النظامية التي كانت موجودة سابقاً — لا حاجة
+        //  بعد الآن لأي منها هنا (حقل البحث نفسه أصبح للعرض فقط، غير قابل للتركيز
+        //  إطلاقاً؛ نظام تنقّل الريموت العام بالتطبيق لم يعد يحتاج أي استثناء بسببه).
+        const KEYBOARD_LAYOUTS = {
+            ar: [
+                ['1','2','3','4','5','6','7','8','9','0'],
+                ['ض','ص','ث','ق','ف','غ','ع','ه','خ','ح','ج'],
+                ['ش','س','ي','ب','ل','ا','ت','ن','م','ك','ط'],
+                ['ئ','ء','ؤ','ر','لا','ى','ة','و','ز','ظ','ذ'],
+            ],
+            en: [
+                ['1','2','3','4','5','6','7','8','9','0'],
+                ['Q','W','E','R','T','Y','U','I','O','P'],
+                ['A','S','D','F','G','H','J','K','L'],
+                ['Z','X','C','V','B','N','M'],
+            ],
+        };
+
+        let keyboardLang = 'ar';
+        let keyboardRow = 1; // صف أول حرف مباشرة (بعد صف الأرقام) — جاهز للكتابة فوراً دون خطوة إضافية
+        let keyboardCol = 0;
+        let modeBeforeKeyboard = 'CATEGORIES';
+
+        function getKeyboardRows() {
+            const charRows = KEYBOARD_LAYOUTS[keyboardLang].map(row => row.map(ch => ({ type: 'char', label: ch, value: ch })));
+            const controlRow = [
+                { type: 'lang',      label: keyboardLang === 'ar' ? 'ABC' : 'أ ب ج' },
+                { type: 'space',     label: '␣ مسافة', wide: true },
+                { type: 'backspace', label: '⌫' },
+                { type: 'clear',     label: '✕ مسح' },
+                { type: 'search',    label: '🔍 بحث' },
+            ];
+            return [...charRows, controlRow];
+        }
+
+        function openCustomKeyboard() {
+            modeBeforeKeyboard = (currentMode === 'SEARCH') ? 'CATEGORIES' : currentMode;
+            keyboardRow = 1;
+            keyboardCol = 0;
+            currentMode = 'KEYBOARD';
+            renderKeyboardGrid();
+            keyboardModal.classList.add('active');
+            updateFocus();
+        }
+
+        // تُستدعى عند زر "بحث" باللوحة نفسها أو زر الرجوع الفعلي بالريموت — كلاهما
+        // يُغلق لوحة المفاتيح وينقل التحكم فوراً للقائمة، تماماً كما طُلب صراحة.
+        function closeCustomKeyboard() {
+            keyboardModal.classList.remove('active');
+            currentMode = modeBeforeKeyboard || 'CATEGORIES';
+            updateFocus();
+        }
+
+        function renderKeyboardGrid() {
+            const rows = getKeyboardRows();
+            let html = '';
+            rows.forEach((row, rIdx) => {
+                html += `<div class="keyboard-row">`;
+                row.forEach((key, cIdx) => {
+                    const wideClass = key.wide ? ' kbd-wide' : '';
+                    const actionClass = key.type !== 'char' ? ' kbd-action' : '';
+                    html += `<div class="kbd-key${wideClass}${actionClass}" data-row="${rIdx}" data-col="${cIdx}">${key.label}</div>`;
+                });
+                html += `</div>`;
+            });
+            keyboardGrid.innerHTML = html;
+            // دعم الفأرة/اللمس المباشر بجانب تنقّل الريموت.
+            keyboardGrid.querySelectorAll('.kbd-key').forEach(el => {
+                el.onclick = () => {
+                    keyboardRow = parseInt(el.dataset.row, 10);
+                    keyboardCol = parseInt(el.dataset.col, 10);
+                    activateFocusedKey();
+                };
+            });
+            updateKeyboardTextDisplay();
+        }
+
+        function updateKeyboardTextDisplay() {
+            keyboardTextDisplay.textContent = searchQuery;
+            searchInput.value = searchQuery; // إبقاء شريط البحث بالخلفية متزامناً بصرياً أيضاً
+        }
+
+        // نفس فكرة debounce الحقيقي المُطبَّقة سابقاً بالضبط — لا تُنفَّذ إعادة رسم
+        // القائمة إلا بعد توقّف المستخدم عن اختيار حروف فعلياً لفترة قصيرة، أو فوراً
+        // عند الضغط الصريح على زر "بحث" باللوحة (immediate=true).
+        function scheduleSearchFilter(immediate) {
+            clearTimeout(searchDebounceTimer);
+            const run = () => {
+                focusIndices.channels = 0;
+                focusIndices.xtream = 0;
+                if (xtreamStack.length > 0) xtreamRepaintCurrent();
+                else filterChannels();
+            };
+            if (immediate) run();
+            else searchDebounceTimer = setTimeout(run, SEARCH_DEBOUNCE_MS);
+        }
+
+        function activateFocusedKey() {
+            const rows = getKeyboardRows();
+            const key = rows[keyboardRow] && rows[keyboardRow][keyboardCol];
+            if (!key) return;
+
+            if (key.type === 'char') {
+                searchQuery += key.value;
+            } else if (key.type === 'space') {
+                searchQuery += ' ';
+            } else if (key.type === 'backspace') {
+                searchQuery = searchQuery.slice(0, -1);
+            } else if (key.type === 'clear') {
+                searchQuery = '';
+            } else if (key.type === 'lang') {
+                keyboardLang = keyboardLang === 'ar' ? 'en' : 'ar';
+                keyboardCol = 0;
+                renderKeyboardGrid();
+                updateFocus();
+                return;
+            } else if (key.type === 'search') {
+                closeCustomKeyboard();
+                scheduleSearchFilter(true);
+                return;
+            }
+
+            updateKeyboardTextDisplay();
+            scheduleSearchFilter(false);
+        }
+
+        function handleKeyboardNav(key) {
+            const rows = getKeyboardRows();
+            if (key === 'ArrowDown') {
+                keyboardRow = Math.min(keyboardRow + 1, rows.length - 1);
+                keyboardCol = Math.min(keyboardCol, rows[keyboardRow].length - 1);
+            } else if (key === 'ArrowUp') {
+                keyboardRow = Math.max(keyboardRow - 1, 0);
+                keyboardCol = Math.min(keyboardCol, rows[keyboardRow].length - 1);
+            } else if (key === 'ArrowRight') { // يمين = نحو بداية الصف (اتساقاً مع بقية اتجاهات RTL بالتطبيق)
+                keyboardCol = Math.max(keyboardCol - 1, 0);
+            } else if (key === 'ArrowLeft') {
+                keyboardCol = Math.min(keyboardCol + 1, rows[keyboardRow].length - 1);
+            } else if (key === 'Enter' || key === ' ') {
+                activateFocusedKey();
+                return;
+            }
+            updateFocus();
+        }
+
         // ─── تحميل القنوات ──────────────────────────────────────────────
         const MAIN_CHANNELS_URL = "https://raw.githubusercontent.com/ossamasal2012/yalla-data/refs/heads/main/channels.json";
         const QURAN_JSON_URL = "https://raw.githubusercontent.com/ossamasal2012/quran/refs/heads/main/quran.json";
@@ -1160,11 +1400,39 @@
             renderChannels();
         }
 
+        // نافذة عرض ذكية لقائمة القنوات العادية — نفس المبدأ المُثبَت أصلاً بقوائم
+        // Xtream الكبيرة (راجع XTREAM_WINDOW_THRESHOLD/SIZE وxtreamRenderWindowedScreen
+        // أعلاه)، معمَّم هنا أيضاً: لا نبني بالـDOM فعلياً إلا نافذة صغيرة حول العنصر
+        // المركَّز حالياً بدل آلاف/مئات آلاف العقد دفعة واحدة — يبقى هذا سريعاً جداً
+        // وسلساً حتى لو حمل ملف channels.json مستقبلاً عدداً هائلاً من القنوات.
+        const CHANNELS_WINDOW_THRESHOLD = 120;
+        const CHANNELS_WINDOW_SIZE = 80;
+        let channelsWindowStart = 0;
+        let channelsWindowEnd = 0;
+
         function renderChannels() {
             if (filteredChannels.length === 0) {
                 channelsBox.innerHTML = `<div class="text-center text-slate-500 mt-10 font-bold">لا توجد قنوات في هذا التصنيف</div>`;
+                channelsWindowStart = 0;
+                channelsWindowEnd = 0;
                 return;
             }
+
+            const total = filteredChannels.length;
+            let startIdx = 0, endIdx = total;
+            let topNotice = '', bottomNotice = '';
+
+            if (total > CHANNELS_WINDOW_THRESHOLD) {
+                const half = Math.floor(CHANNELS_WINDOW_SIZE / 2);
+                const focusItemIdx = Math.max(0, focusIndices.channels - (isInFolder ? 1 : 0));
+                startIdx = Math.max(0, focusItemIdx - half);
+                endIdx = Math.min(total, startIdx + CHANNELS_WINDOW_SIZE);
+                startIdx = Math.max(0, endIdx - CHANNELS_WINDOW_SIZE);
+                if (startIdx > 0) topNotice = `<div class="text-center text-slate-600 text-sm font-bold py-3">▲ ${startIdx} عنصر أعلى — تابع الضغط للأعلى</div>`;
+                if (endIdx < total) bottomNotice = `<div class="text-center text-slate-600 text-sm font-bold py-3">▼ ${total - endIdx} عنصر أسفل — تابع الضغط للأسفل</div>`;
+            }
+            channelsWindowStart = startIdx;
+            channelsWindowEnd = endIdx;
 
             let html = "";
             if (isInFolder) {
@@ -1173,8 +1441,10 @@
                     <i class="fa-solid fa-arrow-right"></i> رجوع للقائمة الرئيسية
                 </div>`;
             }
+            html += topNotice;
 
-            filteredChannels.forEach((ch, idx) => {
+            for (let idx = startIdx; idx < endIdx; idx++) {
+                const ch = filteredChannels[idx];
                 const actualIdx = isInFolder ? idx + 1 : idx;
                 if (ch.isFolder) {
                     const icon = ch.icon || 'fa-solid fa-folder text-slate-400';
@@ -1204,7 +1474,8 @@
                         <span class="text-xs bg-slate-800 text-slate-400 px-2 py-1 rounded">${ch.category || 'عام'}</span>
                     </div>`;
                 }
-            });
+            }
+            html += bottomNotice;
 
             channelsBox.innerHTML = html;
             channelsBox.scrollTop = 0;
@@ -1461,26 +1732,6 @@
             el.setAttribute('tabindex', '-1');
         }
 
-        // ─── نقطتا الدخول/الخروج الوحيدتان لوضع "تحرير نص البحث" ────────────────
-        // كل مكان بالتطبيق يريد بدء/إنهاء الكتابة الفعلية بحقل البحث يستدعي هاتين
-        // الدالتين تحديداً (بدل التعامل المباشر مع focusInputIntentionally/
-        // blurInputIntentionally) — يضمن هذا استحالة تعارض isSearchEditing مع الواقع
-        // الفعلي لحالة التركيز، مهما كثرت نقاط الاستدعاء عبر الكود.
-        function enterSearchEditingMode() {
-            isSearchEditing = true;
-            focusInputIntentionally(searchInput);
-            showKeyboardNative();
-        }
-
-        function exitSearchEditingMode() {
-            isSearchEditing = false;
-            clearTimeout(searchDebounceTimer);
-            blurInputIntentionally(searchInput);
-            hideKeyboardNative();
-            currentMode = 'CATEGORIES';
-            updateFocus();
-        }
-
         function sanitizeDomFocus() {
             const active = document.activeElement;
             if (!active || active === document.body) return;
@@ -1622,6 +1873,10 @@
                 } else {
                     document.getElementById('settings-btn-close').classList.add('tv-focus');
                 }
+
+            } else if (currentMode === 'KEYBOARD') {
+                const el = keyboardGrid.querySelector(`.kbd-key[data-row="${keyboardRow}"][data-col="${keyboardCol}"]`);
+                if (el) el.classList.add('tv-focus');
             }
         }
 
@@ -1630,17 +1885,18 @@
             const key = e.key;
 
             // ═══ وضع التحرير النصي (Editing Mode) — يُفصَل صراحةً هنا عن وضع التنقّل ═══
-            // بينما حقل البحث أو حقل كلمة السر يملك تركيزاً حقيقياً فعلياً (المستخدم
-            // يكتب الآن)، نُسلِّم كل مفتاح لسلوكه الافتراضي الطبيعي الكامل بالحقل نفسه
-            // فوراً هنا، دون أي تدخل من نظام تنقّل الريموت العام أدناه إطلاقاً — لا
-            // preventDefault لأي مفتاح، ولا استدعاء لأي دالة handleXxxNav. الحقلان لهما
-            // مستمعا keydown خاصان بهما فقط (Escape/Enter تحديداً لإنهاء التحرير)
-            // يسبقان هذا المستمع بمرحلة الاستهداف (Target Phase) قبل الفقاعة (Bubble)،
-            // وهما من يقرران الخروج من وضع التحرير عند الحاجة عبر exitSearchEditingMode
-            // — وليس هنا. بهذا: حروف/أرقام/مسافة تُكتَب بشكل طبيعي 100%، وBackspace
-            // يحذف حرفاً بشكل طبيعي 100%، والأسهم يسار/يمين تُحرِّك مؤشر الكتابة داخل
-            // النص بشكل طبيعي 100% — لا شيء منها "يتسرّب" لنظام تنقّل التطبيق إطلاقاً.
-            if (document.activeElement === searchInput || document.activeElement === authInput) {
+            // يخص حقل كلمة السر تحديداً الآن (حقل البحث لم يعد يستخدم أي تركيز DOM
+            // حقيقي إطلاقاً — كتابته بالكامل عبر لوحة المفاتيح الافتراضية داخل التطبيق،
+            // وهي تُعامَل كأي وضع تنقّل عادي بالتطبيق، لا كحالة استثنائية هنا). بينما
+            // حقل كلمة السر يملك تركيزاً حقيقياً فعلياً (المستخدم يكتب الآن)، نُسلِّم كل
+            // مفتاح لسلوكه الافتراضي الطبيعي الكامل بالحقل نفسه فوراً هنا، دون أي تدخل
+            // من نظام تنقّل الريموت العام أدناه إطلاقاً — لا preventDefault لأي مفتاح،
+            // ولا استدعاء لأي دالة handleXxxNav. الحقل له مستمع keydown خاص به فقط
+            // (Enter تحديداً لإرسال كلمة السر مباشرة) يسبق هذا المستمع بمرحلة الاستهداف
+            // (Target Phase) قبل الفقاعة (Bubble). بهذا: حروف/أرقام/مسافة تُكتَب بشكل
+            // طبيعي 100%، وBackspace يحذف حرفاً بشكل طبيعي 100%، والأسهم يسار/يمين
+            // تُحرِّك مؤشر الكتابة داخل النص بشكل طبيعي 100%.
+            if (document.activeElement === authInput) {
                 return;
             }
 
@@ -1699,6 +1955,7 @@
             else if (currentMode === 'UPDATE_PROMPT' || currentMode === 'UPDATE_PROGRESS') handleUpdateNav(key);
             else if (currentMode === 'TOP_SETTINGS')    handleTopSettingsNav(key);
             else if (currentMode === 'SETTINGS_MODAL')  handleSettingsModalNav(key);
+            else if (currentMode === 'KEYBOARD')        handleKeyboardNav(key);
         });
 
         function handleAuthNav(key) {
@@ -1744,9 +2001,9 @@
         }
 
         function handleSearchNav(key) {
-            if      (key === 'ArrowDown') { exitSearchEditingMode(); }
+            if      (key === 'ArrowDown') { currentMode = 'CATEGORIES'; updateFocus(); }
             else if (key === 'ArrowUp')   { currentMode = 'TOP_SETTINGS'; updateFocus(); }
-            else if (key === 'Enter')     { enterSearchEditingMode(); }
+            else if (key === 'Enter')     { openCustomKeyboard(); }
         }
 
         // WebView لا يُظهر لوحة المفاتيح البرمجية بشكل موثوق دائماً عند تركيز حقل نصي
@@ -1836,7 +2093,19 @@
                 }
                 return;
             }
-            updateFocus();
+
+            // إن كانت القائمة "نافذيّة" (تجاوزت العتبة) والموضع الجديد صار خارج النافذة
+            // المرسومة فعلياً بالـDOM حالياً، أعد الرسم لتوسيط نافذة جديدة حوله. في
+            // الحالة الشائعة (قوائم صغيرة/متوسطة تحت العتبة، وهي الغالبية العظمى دائماً)
+            // هذا لا يتحقق أبداً، فيبقى الأمر مجرد تحديث للمؤشر البصري فقط — أخف وأسرع
+            // بكثير من إعادة رسم كاملة مع كل ضغطة، بعكس الاعتماد على إعادة رسم دائمة.
+            const logicalIdx = focusIndices.channels - (isInFolder ? 1 : 0);
+            if (filteredChannels.length > CHANNELS_WINDOW_THRESHOLD &&
+                (logicalIdx < channelsWindowStart || logicalIdx >= channelsWindowEnd)) {
+                renderChannels();
+            } else {
+                updateFocus();
+            }
         }
 
         // دالة استعلام فقط (لا تُغيّر أي حالة) يستخدمها غلاف أندرويد الأصلي عبر
@@ -1906,6 +2175,12 @@
                 // زر الرجوع الفعلي بالريموت يعمل هنا تماماً كزر "🔙 رجوع" الظاهر بالنافذة
                 // نفسها — يعود خطوة واحدة فقط لواجهة التطبيق الرئيسية، كما هو مطلوب.
                 closeSettingsModal();
+            }
+            else if (currentMode === 'KEYBOARD') {
+                // بالضبط كما طُلب: زر الرجوع الفعلي بالريموت يُغلق لوحة المفاتيح
+                // وينقل التحكم فوراً للقائمة (نفس أثر زر "🔍 بحث" باللوحة نفسها، لكن
+                // دون تنفيذ بحث فوري — البحث الحي أثناء الكتابة استمر يعمل أصلاً).
+                closeCustomKeyboard();
             }
         }
 
@@ -2226,6 +2501,14 @@
         function xtreamHandleSimpleListNav(key) {
             const total = xtreamActiveItems.length + 1;
             if (key === 'ArrowUp') {
+                if (focusIndices.xtream === 0) {
+                    // بلغنا أعلى القائمة فعلياً — انتقل لزر البحث مباشرة، بحيث يمكن
+                    // الوصول للبحث بالريموت من أي شاشة بالتطبيق دون استثناء، مهما
+                    // كانت عمق التصفّح الحالي داخل Xtream.
+                    currentMode = 'SEARCH';
+                    updateFocus();
+                    return;
+                }
                 focusIndices.xtream = Math.max(focusIndices.xtream - 1, 0);
             } else if (key === 'ArrowDown') {
                 focusIndices.xtream = Math.min(focusIndices.xtream + 1, total - 1);
@@ -2279,7 +2562,15 @@
             const total = xtreamActiveItems.length + 1;
             let moved = false;
             if (key === 'ArrowUp') {
-                if (focusIndices.xtream > 0) { focusIndices.xtream--; moved = true; }
+                if (focusIndices.xtream === 0) {
+                    // نفس مبدأ xtreamHandleSimpleListNav أعلاه بالضبط: أعلى القائمة
+                    // فعلياً ينقل لزر البحث مباشرة — الوصول للبحث بالريموت متاح من
+                    // أي شاشة Xtream دون استثناء، حتى القوائم الضخمة "النافذيّة" هنا.
+                    currentMode = 'SEARCH';
+                    updateFocus();
+                    return;
+                }
+                focusIndices.xtream--; moved = true;
             } else if (key === 'ArrowDown') {
                 if (focusIndices.xtream < total - 1) { focusIndices.xtream++; moved = true; }
             } else if (key === 'ArrowRight') {
@@ -3669,67 +3960,6 @@
                 clearTimeout(errorAutoSwitchTimer);
                 errorAutoSwitchTimer = null;
             }
-        }
-
-        // ─── البحث ────────────────────────────────────────────────────────
-        // إعادة الرسم الكاملة للقائمة (قد تصل لمئات العناصر) عملية غير رخيصة — تنفيذها
-        // بلا أي تأخير مع كل ضغطة حرف أثناء الكتابة السريعة هو ما كان يُثقل خيط الواجهة
-        // الرئيسي بعشرات إعادات الرسم المتلاحقة، لدرجة قد تُربك اتصال لوحة المفاتيح
-        // البرمجية بالحقل نفسه على بعض الأجهزة (وهو ما كان يبدو وكأن الكتابة "تتوقف" أو
-        // "تُنفِّذ البحث بعد أول حرف فقط"). الحل: تأخير حقيقي (debounce) — لا تُنفَّذ إعادة
-        // الرسم إلا بعد توقّف المستخدم عن الكتابة لفترة قصيرة فعلاً، تماماً كما طُلب.
-        searchInput.addEventListener('input', (e) => {
-            searchQuery = e.target.value;
-            clearTimeout(searchDebounceTimer);
-            searchDebounceTimer = setTimeout(() => {
-                focusIndices.channels = 0;
-                focusIndices.xtream = 0;
-                if (xtreamStack.length > 0) {
-                    xtreamRepaintCurrent();
-                } else {
-                    filterChannels();
-                }
-            }, SEARCH_DEBOUNCE_MS);
-        });
-
-        // ─── الخروج من وضع الكتابة بالبحث ───────────────────────────────────
-        // العلّة المُبلَّغة: عندما يُغلق المستخدم لوحة المفاتيح البرمجية بطريقة لا تصل
-        // كحدث keydown لصفحتنا إطلاقاً (مثال: زر الرجوع الفعلي بالريموت أثناء ظهور
-        // لوحة المفاتيح — أندرويد "يبتلع" هذه الضغطة بالكامل لإغلاق اللوحة فقط ولا
-        // يُمرّرها لتطبيقنا أبداً)، يبقى currentMode عالقاً على 'SEARCH' رغم أن
-        // المستخدم يظن أنه عاد للتصفّح — فتصل ضغطة OK التالية لحقل البحث بدل العنصر
-        // الذي يتنقّل إليه فعلياً (وهذا بالضبط "المؤشر الثاني الوهمي" المذكور).
-        //
-        // الحل بثلاث طبقات، كلها تصبّ الآن بنقطة خروج واحدة موحّدة (exitSearchEditingMode):
-        // 1) نجعل حقل البحث type="search" مع enterkeyhint="search" كي تُظهر لوحة
-        //    المفاتيح زر "بحث/تم" صريحاً، ونتعامل معه هنا بنفس معاملة زر الرجوع
-        //    (Escape) تماماً — طريقة "إنهاء" مضمونة الوصول لصفحتنا كحدث حقيقي.
-        // 2) حدث "search" المخصّص لحقول type="search" ببعض تطبيقات لوحة المفاتيح.
-        // 3) مراقب visualViewport أدناه: يلتقط أي إغلاق للوحة المفاتيح مهما كانت
-        //    الطريقة (حتى تلك التي لا تصل كحدث keydown/search إطلاقاً) بالاعتماد على
-        //    تغيّر حجم الشاشة المرئي فعلياً بدل انتظار حدث معيّن قد لا يصل أبداً.
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' || e.key === 'Enter') {
-                // نمنع وصول نفس الضغطة لمستمع keydown الرئيسي بـdocument: بدونها،
-                // "Escape" تحديداً كان يُعامَل هناك أيضاً كزر رجوع عام (isBack)، فيُعيد
-                // currentMode فوراً لـ'SEARCH' مجدداً — إلغاءً لِما فعلناه للتو بنفس الضغطة.
-                e.stopPropagation();
-                exitSearchEditingMode();
-            }
-        });
-
-        searchInput.addEventListener('search', () => {
-            if (isSearchEditing) exitSearchEditingMode();
-        });
-
-        if (window.visualViewport) {
-            let lastVisualViewportHeight = window.visualViewport.height;
-            window.visualViewport.addEventListener('resize', () => {
-                const newHeight = window.visualViewport.height;
-                const grewBack = newHeight > lastVisualViewportHeight + 40;
-                lastVisualViewportHeight = newHeight;
-                if (grewBack && isSearchEditing) exitSearchEditingMode();
-            });
         }
 
         // ─── تشغيل ────────────────────────────────────────────────────────
