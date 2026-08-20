@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -712,6 +713,16 @@
         let currentServerIndex = 0;
         let currentOpenChannelObj = null;
         let isInFolder = false;
+        // آخر وضع "محتوى" حقيقي (قنوات عادية/مجلد قرآن أو قصائد/أي مستوى تصفّح داخل
+        // Xtream) كان المستخدم يتصفّحه فعلياً قبل الصعود نحو التصنيفات/البحث — يُحدَّث
+        // تلقائياً بكل استدعاء لـupdateFocus() طالما currentMode "وضع محتوى" حقيقي، فيبقى
+        // دقيقاً دوماً بلا حاجة لتحديثه يدوياً بكل دالة تنقّل على حدة. يُستخدم لاحقاً
+        // (راجع resumeLastContentMode) لإعادة المستخدم لنفس المكان بالضبط عند النزول من
+        // البحث/التصنيفات — بدل الانتقال دائماً لقائمة القنوات المسطّحة العادية بغض النظر
+        // عن عمق تصفّحه داخل Xtream قبل ذلك (هذا بالضبط كان يُفقِد موضع تصفّح Xtream سابقاً؛
+        // مجلدا القرآن/القصائد لا يتأثران أصلاً لأنهما يبقيان currentMode==='CHANNELS' طوال
+        // الوقت، وfilteredChannels/isInFolder يُحفظان تلقائياً دون أي تدخل إضافي مطلوب).
+        let lastContentMode = 'CHANNELS';
         let isIframeMode = false;
         let errorAutoSwitchTimer = null;
         let isErrorShown = false;
@@ -1774,6 +1785,12 @@
             // بعد كل انتقال حالة أو رسم واجهة تقريباً بلا استثناء.
             hardenButtonFocusability();
             sanitizeDomFocus();
+            // راجع تعليق تعريف lastContentMode أعلاه — نُحدِّثها هنا تلقائياً بكل مرة
+            // (BROWSE_MODES معرَّفة لاحقاً بالملف، لكن هذا السطر لا يُنفَّذ فعلياً إلا بعد
+            // اكتمال تحميل الصفحة بالكامل، فلا مشكلة بترتيب التعريف إطلاقاً هنا).
+            if (BROWSE_MODES.includes(currentMode)) {
+                lastContentMode = currentMode;
+            }
             document.querySelectorAll('.tv-focus, .tv-focus-search, .server-chip.tv-focus, .iframe-btn.tv-focus, .error-btn.tv-focus').forEach(el => {
                 el.classList.remove('tv-focus', 'tv-focus-search');
             });
@@ -2000,8 +2017,22 @@
             updateFocus();
         }
 
+        // يُستدعى من كل نقطة "نزول" ممكنة نحو المحتوى (من البحث مباشرة، أو من
+        // التصنيفات) — يُعيد المستخدم بالضبط لآخر مكان محتوى حقيقي كان يتصفّحه (راجع
+        // تعليق تعريف lastContentMode)، بما في ذلك أي عمق تصفّح داخل Xtream، بدل
+        // القفز دائماً لقائمة القنوات المسطّحة العادية بغض النظر عن ذلك.
+        function resumeLastContentMode() {
+            if (lastContentMode !== 'CHANNELS' && BROWSE_MODES.includes(lastContentMode) && xtreamStack.length > 0) {
+                currentMode = lastContentMode;
+                xtreamRepaintCurrent();
+            } else {
+                currentMode = 'CHANNELS';
+                updateFocus();
+            }
+        }
+
         function handleSearchNav(key) {
-            if      (key === 'ArrowDown') { currentMode = 'CATEGORIES'; updateFocus(); }
+            if      (key === 'ArrowDown') { resumeLastContentMode(); }
             else if (key === 'ArrowUp')   { currentMode = 'TOP_SETTINGS'; updateFocus(); }
             else if (key === 'Enter')     { openCustomKeyboard(); }
         }
@@ -2031,6 +2062,10 @@
             const max = document.querySelectorAll('.category-btn').length - 1;
             if      (key === 'ArrowUp')   { currentMode = 'SEARCH'; updateFocus(); return; }
             else if (key === 'ArrowDown') {
+                if (lastContentMode !== 'CHANNELS' && BROWSE_MODES.includes(lastContentMode) && xtreamStack.length > 0) {
+                    resumeLastContentMode();
+                    return;
+                }
                 if (filteredChannels.length > 0) { currentMode = 'CHANNELS'; updateFocus(); return; }
             }
             else if (key === 'ArrowLeft')  focusIndices.categories = Math.min(focusIndices.categories + 1, max);
@@ -2405,7 +2440,7 @@
             }
             channelsBox.innerHTML = html;
             channelsBox.scrollTop = 0;
-            updateXtreamFocus();
+            updateFocus();
         }
 
         function formatExpiryInfo(userInfo) {
@@ -2495,7 +2530,13 @@
             }
             channelsBox.innerHTML = html;
             channelsBox.scrollTop = 0;
-            updateXtreamFocus();
+            // نستدعي updateFocus() العامة هنا (لا updateXtreamFocus() مباشرة) عمداً —
+            // فهي من تُحدِّث lastContentMode (الأساس الذي تعتمد عليه إعادة استئناف تصفّح
+            // Xtream عند العودة من البحث)، وتُطبِّق أيضاً نفس حماية hardenButtonFocusability/
+            // sanitizeDomFocus المطبَّقة بكل شاشة أخرى بالتطبيق. الاستدعاء المباشر
+            // لـupdateXtreamFocus() سابقاً هنا كان يتجاوز كل ذلك بصمت — وهو السبب
+            // الجذري الفعلي وراء تعذّر العودة لمحتوى Xtream بعد الذهاب للبحث.
+            updateFocus();
         }
 
         function xtreamHandleSimpleListNav(key) {
@@ -2521,7 +2562,7 @@
                 if (xtreamActiveOnSelect) xtreamActiveOnSelect(xtreamActiveItems[focusIndices.xtream - 1], focusIndices.xtream - 1);
                 return;
             }
-            updateXtreamFocus();
+            updateFocus();
         }
 
         // ─── شاشة "قائمة بتمرير مبني على التركيز" (Focus-Windowed) — للقوائم التي قد
@@ -2533,14 +2574,18 @@
         //  الموضع كما يلزم بالتمرير اللمسي الحر. ───────────────────────────────────
         const XTREAM_WINDOW_THRESHOLD = 120;
         const XTREAM_WINDOW_SIZE = 80;
+        let xtreamWindowStart = 0;
+        let xtreamWindowEnd = 0;
 
         function xtreamRenderWindowedScreen(backLabel, items, itemHtmlFn, emptyMessage) {
             const total = items.length;
             let bodyHtml;
             if (total === 0) {
                 bodyHtml = `<div class="text-center text-slate-500 mt-10 font-bold">${escHtml(emptyMessage)}</div>`;
+                xtreamWindowStart = 0; xtreamWindowEnd = 0;
             } else if (total <= XTREAM_WINDOW_THRESHOLD) {
                 bodyHtml = items.map((it, i) => itemHtmlFn(it, i + 1)).join('');
+                xtreamWindowStart = 0; xtreamWindowEnd = total;
             } else {
                 const half = Math.floor(XTREAM_WINDOW_SIZE / 2);
                 const focusItemIdx = Math.max(0, focusIndices.xtream - 1);
@@ -2552,10 +2597,13 @@
                 for (let i = start; i < end; i++) html += itemHtmlFn(items[i], i + 1);
                 if (end < total) html += `<div class="text-center text-slate-600 text-sm font-bold py-3">▼ ${total - end} عنصر أسفل — تابع الضغط للأسفل</div>`;
                 bodyHtml = html;
+                xtreamWindowStart = start; xtreamWindowEnd = end;
             }
             channelsBox.innerHTML = xtreamBackRowHtml(backLabel) + bodyHtml;
             channelsBox.scrollTop = 0;
-            updateXtreamFocus();
+            // updateFocus() العامة، لا updateXtreamFocus() مباشرة — نفس السبب المذكور
+            // أعلاه بالضبط بـxtreamRenderSimpleListScreen (lastContentMode + الحماية العامة).
+            updateFocus();
         }
 
         function xtreamHandleWindowedNav(key, repaintFn) {
@@ -2584,7 +2632,22 @@
                 if (xtreamActiveOnSelect) xtreamActiveOnSelect(xtreamActiveItems[focusIndices.xtream - 1], focusIndices.xtream - 1);
                 return;
             }
-            if (moved) repaintFn();
+
+            if (!moved) return;
+
+            // إعادة الرسم الكاملة (repaintFn) لازمة فقط عندما تكون القائمة "نافذيّة" فعلاً
+            // (تجاوزت العتبة) والموضع الجديد صار خارج النافذة المرسومة بالـDOM حالياً —
+            // أي عندما يلزم فعلياً إزاحة النافذة. غير ذلك (الحالة الشائعة جداً: قوائم
+            // صغيرة/متوسطة تحت العتبة) يكفي تحديث المؤشر البصري فقط دون أي إعادة رسم على
+            // الإطلاق — كانت إعادة الرسم الكاملة تُنفَّذ سابقاً مع كل ضغطة سهم بلا استثناء،
+            // وهذا بالضبط ما كان يبدو وكأن "المحتوى يُعاد جلبه/عرضه" مع كل حركة بالريموت.
+            const logicalIdx = focusIndices.xtream - 1;
+            if (xtreamActiveItems.length > XTREAM_WINDOW_THRESHOLD &&
+                (logicalIdx < xtreamWindowStart || logicalIdx >= xtreamWindowEnd)) {
+                repaintFn();
+            } else {
+                updateFocus();
+            }
         }
 
         // ─── عميل Xtream Codes API ─────────────────────────────────────────
@@ -2774,7 +2837,7 @@
             channelsBox.innerHTML = xtreamBackRowHtml(server.name) + xtreamSpinnerHtml('جاري تسجيل الدخول...');
             channelsBox.scrollTop = 0;
             xtreamSetActiveList([], null, null);
-            updateXtreamFocus();
+            updateFocus();
 
             const auth = await xtreamAuthenticate(serverId);
             if (!xtreamIsFrame('xtream-home', f => f.serverId === serverId)) return;
@@ -2812,7 +2875,7 @@
 
             channelsBox.innerHTML = xtreamBackRowHtml(server.name) + banner + `<div class="my-2 space-y-2">${bodyHtml}</div>` + banner;
             channelsBox.scrollTop = 0;
-            updateXtreamFocus();
+            updateFocus();
         }
 
         function handleXtreamHomeNav(key) { xtreamHandleSimpleListNav(key); }
@@ -2831,7 +2894,7 @@
             channelsBox.innerHTML = xtreamBackRowHtml(title) + xtreamSpinnerHtml('جاري تحميل التصنيفات...');
             channelsBox.scrollTop = 0;
             xtreamSetActiveList([], null, null);
-            updateXtreamFocus();
+            updateFocus();
 
             let cats;
             try {
@@ -2891,7 +2954,7 @@
             channelsBox.innerHTML = xtreamBackRowHtml(title) + xtreamSpinnerHtml('جاري تحميل القائمة...');
             channelsBox.scrollTop = 0;
             xtreamSetActiveList([], null, null);
-            updateXtreamFocus();
+            updateFocus();
 
             let items;
             try {
@@ -2973,7 +3036,7 @@
             channelsBox.innerHTML = xtreamBackRowHtml(title) + xtreamSpinnerHtml('جاري تحميل المواسم...');
             channelsBox.scrollTop = 0;
             xtreamSetActiveList([], null, null);
-            updateXtreamFocus();
+            updateFocus();
 
             let result;
             try {
@@ -3025,7 +3088,7 @@
             channelsBox.innerHTML = xtreamBackRowHtml(title) + xtreamSpinnerHtml('جاري تحميل الحلقات...');
             channelsBox.scrollTop = 0;
             xtreamSetActiveList([], null, null);
-            updateXtreamFocus();
+            updateFocus();
 
             let result;
             try {
